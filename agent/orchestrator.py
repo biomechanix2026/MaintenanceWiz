@@ -30,6 +30,7 @@ from config import ALERT_THRESHOLD
 TOOL_FUNCS = {
     "resolve_asset": lambda a: T.resolve_asset(a["query"]),
     "prognostic_tool": lambda a: T.prognostic_tool(a["asset_id"]),
+    "abnormality_tool": lambda a: T.abnormality_tool(a["asset_id"]),
     "rag_tool": lambda a: T.rag_tool(a["query"], a.get("asset_id"), a.get("k", 4)),
     "inventory_tool": lambda a: T.inventory_tool(a["asset_id"]),
     "sql_query_tool": lambda a: T.sql_query_tool(a["sql"]),
@@ -49,6 +50,8 @@ TOOL_SCHEMAS = [
     {"name": "resolve_asset", "description": "Map free-text/jargon to a formal asset_id.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
     {"name": "prognostic_tool", "description": "RUL, failure probability and SHAP attribution for an asset.",
+     "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
+    {"name": "abnormality_tool", "description": "Independent dynamic abnormality detection from sensor deviations and trend.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
     {"name": "rag_tool", "description": "Retrieve SOP/manual/incident text, optionally filtered to an asset_id.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "asset_id": {"type": "string"}, "k": {"type": "integer"}}, "required": ["query"]}},
@@ -119,10 +122,13 @@ def run_deterministic(query: str, focus_asset: str | None = None,
 
     # STEP 1-4 - gather structured context
     prog = _dispatch("prognostic_tool", {"asset_id": aid}, trace)
+    abnormality = _dispatch("abnormality_tool", {"asset_id": aid}, trace)
     shap = prog.get("shap", {})
     top = shap.get("top_driver")
+    abn_top = (abnormality.get("top_drivers") or [None])[0]
     rag = _dispatch("rag_tool",
-                    {"query": f"{top} fault root cause repair isolation {query}", "asset_id": aid, "k": 6}, trace)
+                    {"query": f"{top} {abn_top} abnormal fault root cause repair isolation {query}",
+                     "asset_id": aid, "k": 6}, trace)
     inv = _dispatch("inventory_tool", {"asset_id": aid}, trace)
     delays = _dispatch("delay_history_tool", {"asset_id": aid}, trace)
     risk = _dispatch("risk_score_tool", {"asset_id": aid}, trace)
@@ -153,18 +159,29 @@ def run_deterministic(query: str, focus_asset: str | None = None,
             alert_line = "\n> **Auto-alert recommended** (CRITICAL) — dispatch on confirmation."
 
     res.structured = {"asset_id": aid, "risk": risk, "prognostic": prog,
+                      "abnormality": abnormality,
                       "inventory": inv, "delays": delays,
                       "alert_recommended": alert_recommended}
-    res.answer_markdown = _render(query, aid, prog, shap, top, risk, delays,
+    res.answer_markdown = _render(query, aid, prog, shap, top, abnormality, risk, delays,
                                   inv, sops, incidents, probable, sql, alert_line)
     return res
 
 
-def _render(query, aid, prog, shap, top, risk, delays, inv, sops, incidents,
+def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, incidents,
             probable, sql, alert_line):
     devs = shap.get("deviations", {})
     drivers = ", ".join(f"{f} ({devs.get(f,0):+.1f}σ)" for f in shap.get("ranked_drivers", [])[:3])
     out_parts = [p for p in inv["parts"] if p["qty_on_hand"] == 0]
+    abn_status = abnormality.get("status", "UNKNOWN")
+    abn_score = abnormality.get("anomaly_score", 0)
+    abn_breaches = abnormality.get("breached_features", [])
+    abn_drivers = ", ".join(
+        f"{b['feature']} ({b['deviation_z']:+.1f}z {b['level']})"
+        for b in abn_breaches[:3]) or "no feature above warning threshold"
+    trend = abnormality.get("trend_features", [])
+    trend_md = ("; ".join(f"{t['feature']} {t['direction']} ({t['trend_delta_z']:+.1f}z)"
+                          for t in trend[:2]) if trend else "no short-window trend breach")
+    catastrophic = "yes" if abnormality.get("catastrophic_risk") else "no"
 
     # Block 3 - blueprint: derive isolation + repair from the SOP section that
     # actually documents the procedure (prefer one with "SOP-"/"Isolation").
@@ -206,13 +223,15 @@ def _render(query, aid, prog, shap, top, risk, delays, inv, sops, incidents,
     md = f"""### 1. Operational Risk Assessment
 - **Asset:** `{aid}`  |  **Priority:** **{risk['priority_band']}** (score **{risk['priority_score']}/100**)
 - **Remaining Useful Life:** **{prog['rul_days']} days**  |  30-day failure probability: **{prog['failure_probability_30d']:.0%}**
+- **Independent abnormality detector:** **{abn_status}** (score **{abn_score}/100**; catastrophic risk: **{catastrophic}**)
 - **Delay severity:** {delays['events']} events, {delays['total_downtime_min']} min downtime, {delays['tonnage_lost']:.0f} t lost{alert_line}
 
 ### 2. Diagnostic & Root-Cause Breakdown
 - **Probable fault:** {probable}
 - **Top SHAP drivers (deviation from healthy baseline):** {drivers}
+- **Abnormal sensor evidence:** {abn_drivers}; trend: {trend_md}
 - **Interpretation:** the prediction is driven primarily by **{top}**; this matches the failure modes documented for this asset.
-- *Attribution method: {shap.get('method')}.*
+- *Attribution method: {shap.get('method')}; abnormality thresholds: warning >= {abnormality.get('thresholds', {}).get('warning_z')}z, critical >= {abnormality.get('thresholds', {}).get('critical_z')}z.*
 
 ### 3. Actionable Maintenance Blueprint
 - **Immediate safety isolation (from {sop_src}):**
@@ -248,6 +267,7 @@ def _structured_from_trace(trace: list, asset_id: str | None) -> dict:
     risk = last("risk_score_tool") or {}
     out = {"asset_id": asset_id, "risk": risk,
            "prognostic": last("prognostic_tool"),
+           "abnormality": last("abnormality_tool"),
            "inventory": last("inventory_tool"),
            "delays": last("delay_history_tool")}
     if risk.get("priority_score") is not None:

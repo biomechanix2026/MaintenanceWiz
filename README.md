@@ -44,10 +44,11 @@ split between an outer agent and sub-agents (which causes "split-brain" knowledg
 mismatches). One loop holds the full context and the entire tool suite.
 
 **Smart tools, not string tools.** Every tool returns a rich structured object:
-the ML tool returns RUL + failure probability + SHAP attribution; the RAG tool
-returns SOP sections tagged to the exact asset; the ERP tool returns stock +
-lead time; the SQL tool returns the *exact SQL it ran* so engineers can validate
-it. This is the "AI to build, UI to validate" philosophy.
+the ML tool returns RUL + failure probability + SHAP attribution; the independent
+abnormality tool returns sensor-deviation and trend evidence; the RAG tool returns
+SOP sections tagged to the exact asset; the ERP tool returns stock + lead time;
+the SQL tool returns the *exact SQL it ran* so engineers can validate it. This is
+the "AI to build, UI to validate" philosophy.
 
 ---
 
@@ -60,6 +61,7 @@ streamlit**, and upgrades automatically when the production libraries are presen
 |---|---|---|
 | Prognostics | scikit-learn `RandomForestRegressor` | pure-numpy bagged tree ensemble |
 | Explainability | `shap.TreeExplainer` | model-agnostic ablation attribution |
+| Abnormality detection | sensor z-score + trend detector | same deterministic rule |
 | Retrieval | ChromaDB vector store | numpy TF-IDF cosine index |
 | Reasoning | Claude tool-use loop (`ANTHROPIC_API_KEY`) | deterministic Python pipeline |
 
@@ -112,7 +114,8 @@ Every diagnosis returns exactly five scannable blocks:
 
 | Scenario | Try in Wizard Chat | What it proves |
 |---|---|---|
-| **Constraint-aware triage** | *what's wrong with the mill gearbox?* | GEARBOX-05 is CRITICAL; pinion lead (45d) **exceeds** RUL (~38d) → the agent switches from "replace now" to a monitored-degradation plan and auto-dispatches an alert. |
+| **Constraint-aware triage** | *what's wrong with the mill gearbox?* | GEARBOX-05 is CRITICAL; pinion lead (45d) **exceeds** RUL (~38d) → the agent switches from "replace now" to a monitored-degradation plan and recommends an alert. |
+| **Independent abnormality detection** | *air compressor status* | Flags sensor deviations/trend separately from the RUL model, giving an early warning before risk scoring alone escalates. |
 | **Fuzzy resolution** | *that valve that keeps leaking on the caster* | Maps plant jargon → `HYD-VALVE-07` before any tool call. |
 | **Abbreviation** | *check the EAF* | Resolves to `FURNACE-01`. |
 | **Pre-shift autonomy** | Pre-Shift Report tab | Work orders drafted for every flagged asset before anyone logs in. |
@@ -130,6 +133,16 @@ failure, so immediate scheduling is the wrong call.
 
 ---
 
+## Abnormality detection
+
+`abnormality_tool` runs independently of the RUL regressor. It compares the
+latest sensor window against the `config.py` NOMINAL baselines, checks short-window
+trend, and emits `NORMAL` / `WARNING` / `CRITICAL` with breached features and
+thresholds. This keeps early-warning detection distinct from the RUL-derived
+failure probability.
+
+---
+
 ## Project layout
 
 ```
@@ -144,7 +157,7 @@ knowledge/
   rag.py                  asset-filtered RAG (ChromaDB or TF-IDF)
 agent/
   system_prompt.py        the Consolidated-Brain system prompt
-  tools.py                the 10-tool suite (structured outputs)
+  tools.py                the 11-tool suite (structured outputs)
   orchestrator.py         think→act→observe loop (LLM + deterministic)
 app/streamlit_app.py      5-panel dashboard
 scripts/pre_shift_run.py  autonomous pre-shift briefing (cron-friendly)

@@ -19,8 +19,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
-from agent.tools import (risk_score_tool, prognostic_tool, inventory_tool,
-                         alert_dispatch_tool)
+from agent.tools import (risk_score_tool, prognostic_tool, abnormality_tool,
+                         inventory_tool, alert_dispatch_tool)
 from config import ALERT_THRESHOLD
 
 REPORTS_DIR = os.path.join(C.ROOT, "reports")
@@ -29,25 +29,37 @@ REPORTS_DIR = os.path.join(C.ROOT, "reports")
 def run():
     os.makedirs(REPORTS_DIR, exist_ok=True)
     reg = pd.read_csv(C.ASSET_REGISTRY_CSV)
-    results = [risk_score_tool(a) for a in reg.asset_id]
-    results.sort(key=lambda r: -r["priority_score"])
+    results = []
+    for aid in reg.asset_id:
+        r = risk_score_tool(aid)
+        abn = abnormality_tool(aid)
+        r["abnormality"] = abn
+        r["anomaly_status"] = abn["status"]
+        r["anomaly_score"] = abn["anomaly_score"]
+        results.append(r)
+    results.sort(key=lambda r: (-r["priority_score"], -r["anomaly_score"]))
 
     crit = [r for r in results if r["priority_band"] == "CRITICAL"]
     high = [r for r in results if r["priority_band"] == "HIGH"]
     flagged = [r for r in results if r.get("constraint_flag")]
+    abnormal = [r for r in results if r["anomaly_status"] != "NORMAL"]
+    action_queue = [r for r in results
+                    if r["priority_band"] in ("CRITICAL", "HIGH")
+                    or r["anomaly_status"] != "NORMAL"]
 
     ts = datetime.now()
     lines = [
         f"# Pre-Shift Maintenance Briefing",
         f"*Generated autonomously at {ts:%Y-%m-%d %H:%M} — before shift start.*",
         "",
-        f"**{len(crit)} critical · {len(high)} high · {len(flagged)} constraint-flagged** "
+        f"**{len(crit)} critical · {len(high)} high · {len(abnormal)} abnormal · "
+        f"{len(flagged)} constraint-flagged** "
         f"out of {len(results)} assets.",
         "",
         "## Action queue (drafted work orders)",
     ]
 
-    for r in crit + high:
+    for r in action_queue:
         aid = r["asset_id"]
         prog = prognostic_tool(aid)
         inv = inventory_tool(aid)
@@ -57,6 +69,8 @@ def run():
             f"### [{r['priority_band']}] {aid} — {name}",
             f"- Priority **{r['priority_score']}/100**, RUL **{r['rul_days']}d**, "
             f"top driver **{prog['shap']['top_driver']}**.",
+            f"- Independent abnormality: **{r['anomaly_status']}** "
+            f"({r['anomaly_score']}/100). {r['abnormality']['recommendation']}",
             f"- Drafted WO: inspect/repair per SOP-{aid}; "
             + ("**order now** (long lead): "
                + ", ".join(f"{p['part_no']} ({p['lead_time_days']}d)" for p in out) + "."
@@ -65,10 +79,11 @@ def run():
         if r.get("constraint_flag"):
             lines.append(f"- ⚠️ {r['constraint_flag']}")
             # auto-dispatch alert for critical/constrained
-        if r["priority_score"] >= ALERT_THRESHOLD:
-            alert_dispatch_tool(aid, r["priority_band"],
-                                f"Pre-shift: {aid} {r['priority_band']} score {r['priority_score']}, "
-                                f"RUL {r['rul_days']}d.")
+        if r["priority_score"] >= ALERT_THRESHOLD or r["abnormality"].get("catastrophic_risk"):
+            level = r["priority_band"] if r["priority_score"] >= ALERT_THRESHOLD else "ANOMALY-CRITICAL"
+            alert_dispatch_tool(aid, level,
+                                f"Pre-shift: {aid} {level} score {r['priority_score']}, "
+                                f"RUL {r['rul_days']}d, anomaly {r['anomaly_status']}.")
             lines.append("- 📧 Alert dispatched to maintenance team.")
         lines.append("")
 
@@ -76,7 +91,8 @@ def run():
     with open(path, "w") as f:
         f.write("\n".join(lines))
     print(f"Pre-shift briefing written: {path}")
-    print(f"  {len(crit)} critical, {len(high)} high, {len(flagged)} constraint-flagged.")
+    print(f"  {len(crit)} critical, {len(high)} high, {len(abnormal)} abnormal, "
+          f"{len(flagged)} constraint-flagged.")
     return path
 
 

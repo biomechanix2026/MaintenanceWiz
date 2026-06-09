@@ -31,6 +31,8 @@ CASES = [
         "expect_constraint_flag": True,      # 45d pinion lead > RUL
         "expect_tool_called": "risk_score_tool",
         "expect_alert_recommended": True,    # CRITICAL -> alert recommended (no side effect)
+        "expect_anomaly_status": "CRITICAL",
+        "expect_catastrophic_risk": True,
     },
     {
         "name": "valve-fuzzy-resolution",
@@ -39,6 +41,7 @@ CASES = [
         "expect_band_in": {"HIGH", "CRITICAL"},
         "expect_constraint_flag": False,     # spool lead 18d < RUL
         "expect_tool_called": "resolve_asset",
+        "expect_anomaly_status": "CRITICAL",
     },
     {
         "name": "healthy-crane-low",
@@ -47,6 +50,7 @@ CASES = [
         "expect_band_in": {"LOW", "MEDIUM"},
         "expect_constraint_flag": False,
         "expect_tool_called": "prognostic_tool",
+        "expect_anomaly_status": "NORMAL",
     },
     {
         "name": "abbreviation-eaf",
@@ -62,6 +66,7 @@ CASES = [
 def judge(case):
     res = run_deterministic(case["query"])
     risk = res.structured.get("risk", {})
+    abnormality = res.structured.get("abnormality", {})
     tools_called = {t["tool"] for t in res.trace}
     checks = {
         "asset_resolved": res.asset_id == case["expect_asset"],
@@ -73,6 +78,12 @@ def judge(case):
     if "expect_alert_recommended" in case:
         checks["alert_recommended"] = (
             bool(res.structured.get("alert_recommended")) == case["expect_alert_recommended"])
+    if "expect_anomaly_status" in case:
+        checks["anomaly_status"] = abnormality.get("status") == case["expect_anomaly_status"]
+        checks["abnormality_tool_called"] = "abnormality_tool" in tools_called
+    if "expect_catastrophic_risk" in case:
+        checks["catastrophic_risk"] = (
+            bool(abnormality.get("catastrophic_risk")) == case["expect_catastrophic_risk"])
     return all(checks.values()), checks, res
 
 

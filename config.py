@@ -72,6 +72,16 @@ PRIORITY_BANDS = [
 ALERT_THRESHOLD = 80
 
 # --------------------------------------------------------------------------
+# Independent abnormality detection
+# --------------------------------------------------------------------------
+# These thresholds are applied to current sensor deviations vs NOMINAL, separate
+# from the RUL regressor. This closes the dynamic abnormality / early-warning
+# objective without changing the deterministic priority score contract.
+ANOMALY_WARNING_Z = 2.0
+ANOMALY_CRITICAL_Z = 3.5
+ANOMALY_TREND_Z = 0.75
+
+# --------------------------------------------------------------------------
 # Feedback loop policy
 # --------------------------------------------------------------------------
 # Engineer feedback ALWAYS re-indexes into the RAG corpus (advisory context).

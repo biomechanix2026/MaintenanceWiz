@@ -148,7 +148,113 @@ def prognostic_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
-# TOOL 2: RAG over manuals / SOPs / incidents (asset-filtered)
+# TOOL 2: Independent abnormality detection (dynamic early warning)
+# ==========================================================================
+def _deviations(asset_type: str, readings: dict) -> dict:
+    nom = C.NOMINAL[asset_type]
+    return {
+        f: round(float((readings[f] - nom[f][0]) / nom[f][1]), 2)
+        for f in SENSOR_FEATURES
+    }
+
+
+def abnormality_tool(asset_id: str, window: int = 5, baseline_window: int = 24) -> dict:
+    """Detect abnormal sensor states independently of the RUL model.
+
+    The prognostic model answers "how much life is left?" This rule-based
+    detector answers "are the current readings abnormal right now?" using
+    z-score deviations from the config-owned NOMINAL baselines plus short-window
+    trend. It is intentionally additive and does not alter priority_score.
+    """
+    reg = _registry()
+    row = reg[reg.asset_id == asset_id]
+    sensors = pd.read_csv(C.SENSOR_LOGS_CSV)
+    g = sensors[sensors.asset_id == asset_id].sort_values("timestamp")
+    if row.empty or g.empty:
+        return {"asset_id": asset_id, "error": f"No sensor data for {asset_id}"}
+
+    asset_type = row.iloc[0]["type"]
+    criticality = int(row.iloc[0]["criticality"])
+    recent = g.tail(window)
+    prior = g.iloc[max(0, len(g) - window - baseline_window):len(g) - window]
+
+    current = {f: round(float(recent[f].mean()), 2) for f in SENSOR_FEATURES}
+    deviations = _deviations(asset_type, current)
+
+    trends = {}
+    if not prior.empty:
+        prior_readings = {f: round(float(prior[f].mean()), 2) for f in SENSOR_FEATURES}
+        prior_devs = _deviations(asset_type, prior_readings)
+        trends = {f: round(deviations[f] - prior_devs[f], 2) for f in SENSOR_FEATURES}
+
+    breaches = []
+    for f, z in deviations.items():
+        abs_z = abs(z)
+        if abs_z < C.ANOMALY_WARNING_Z:
+            continue
+        level = "CRITICAL" if abs_z >= C.ANOMALY_CRITICAL_Z else "WARNING"
+        nominal_mean, _nominal_std = C.NOMINAL[asset_type][f]
+        breaches.append({
+            "feature": f,
+            "level": level,
+            "deviation_z": z,
+            "direction": "high" if z > 0 else "low",
+            "current": current[f],
+            "nominal": nominal_mean,
+        })
+    breaches.sort(key=lambda b: -abs(b["deviation_z"]))
+
+    trend_features = []
+    for f, delta in trends.items():
+        if abs(delta) >= C.ANOMALY_TREND_Z and abs(deviations[f]) >= 1.0:
+            trend_features.append({
+                "feature": f,
+                "trend_delta_z": delta,
+                "direction": "rising" if delta > 0 else "falling",
+            })
+    trend_features.sort(key=lambda b: -abs(b["trend_delta_z"]))
+
+    max_abs = max((abs(z) for z in deviations.values()), default=0.0)
+    if any(b["level"] == "CRITICAL" for b in breaches):
+        status = "CRITICAL"
+    elif breaches or trend_features:
+        status = "WARNING"
+    else:
+        status = "NORMAL"
+
+    anomaly_score = round(min(100.0, (max_abs / C.ANOMALY_CRITICAL_Z) * 100.0), 1)
+    catastrophic_risk = status == "CRITICAL" and criticality >= 4
+    if status == "CRITICAL":
+        recommendation = "Escalate inspection and verify against SOP condition limits."
+    elif status == "WARNING":
+        recommendation = "Increase monitoring frequency and verify sensor condition."
+    else:
+        recommendation = "No independent sensor abnormality detected."
+
+    return {
+        "asset_id": asset_id,
+        "asset_type": asset_type,
+        "status": status,
+        "anomaly_score": anomaly_score,
+        "early_warning": status != "NORMAL",
+        "catastrophic_risk": catastrophic_risk,
+        "current_readings": current,
+        "deviations": deviations,
+        "trend_delta_z": trends,
+        "breached_features": breaches,
+        "trend_features": trend_features,
+        "top_drivers": [f for f, _z in sorted(deviations.items(), key=lambda kv: -abs(kv[1]))[:3]],
+        "thresholds": {
+            "warning_z": C.ANOMALY_WARNING_Z,
+            "critical_z": C.ANOMALY_CRITICAL_Z,
+            "trend_z": C.ANOMALY_TREND_Z,
+        },
+        "recommendation": recommendation,
+    }
+
+
+# ==========================================================================
+# TOOL 3: RAG over manuals / SOPs / incidents (asset-filtered)
 # ==========================================================================
 def rag_tool(query: str, asset_id: str | None = None, k: int = 4) -> dict:
     hits = _rag().query(query, asset_id=asset_id, k=k)
@@ -156,7 +262,7 @@ def rag_tool(query: str, asset_id: str | None = None, k: int = 4) -> dict:
 
 
 # ==========================================================================
-# TOOL 3: ERP inventory (stock + lead times + alternatives)
+# TOOL 4: ERP inventory (stock + lead times + alternatives)
 # ==========================================================================
 def inventory_tool(asset_id: str) -> dict:
     parts = pd.read_csv(C.PARTS_CSV)
@@ -176,7 +282,7 @@ def inventory_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
-# TOOL 4: SQL query (transparent - returns the SQL it ran)
+# TOOL 5: SQL query (transparent - returns the SQL it ran)
 # ==========================================================================
 def sql_query_tool(sql: str) -> dict:
     """Run read-only SQL against assets/sensors/delays/incidents/parts.
@@ -200,7 +306,7 @@ def sql_query_tool(sql: str) -> dict:
 
 
 # ==========================================================================
-# TOOL 5: Delay history (production impact)
+# TOOL 6: Delay history (production impact)
 # ==========================================================================
 def delay_history_tool(asset_id: str) -> dict:
     dl = pd.read_csv(C.DELAY_LOGS_CSV)
@@ -218,7 +324,7 @@ def delay_history_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
-# TOOL 6: Deterministic risk / priority scoring (Step 4)
+# TOOL 7: Deterministic risk / priority scoring (Step 4)
 # ==========================================================================
 def _band(score):
     for thr, name in PRIORITY_BANDS:
@@ -312,7 +418,7 @@ def risk_score_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
-# TOOL 7: Real-time alert dispatch (logs to notifications; mock SMTP)
+# TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def alert_dispatch_tool(asset_id: str, risk_level: str, summary: str,
                         recipients: str = "maintenance-team@plant.local",
@@ -347,7 +453,7 @@ def alert_dispatch_tool(asset_id: str, risk_level: str, summary: str,
 
 
 # ==========================================================================
-# TOOL 8: Task closure compliance checklist (System of Action loop closure)
+# TOOL 9: Task closure compliance checklist (System of Action loop closure)
 # ==========================================================================
 CLOSURE_ITEMS = ["parts_recorded", "steps_logged", "isolation_cleared",
                  "follow_up_scheduled", "digital_logbook_entry"]
@@ -391,9 +497,9 @@ def record_feedback(asset_id: str, work_order_id: str = "", note: str = "",
       1. Retrieval: the feedback text is re-indexed into the RAG corpus (see
          knowledge/rag.build_chunks), so the next diagnosis of this asset
          surfaces the engineer's own words.
-      2. Prioritisation: `severity_adjust` (-25..+25) shifts this asset's future
-         priority score via learned_bias(), so "you under/over-scored this"
-         is reflected next time.
+      2. Prioritisation: `severity_adjust` (-25..+25) is stored as advisory
+         calibration. It shifts the headline priority score only when the
+         explicit MW_APPLY_FEEDBACK_BIAS opt-in is enabled.
     """
     global _RAG
     row = {
@@ -431,4 +537,5 @@ def record_feedback(asset_id: str, work_order_id: str = "", note: str = "",
 if __name__ == "__main__":
     print("resolve:", resolve_asset("that valve that keeps leaking"))
     print("prognostic:", json.dumps(prognostic_tool("CONV-BELT-03"), indent=2)[:300])
+    print("abnormality:", json.dumps(abnormality_tool("CONV-BELT-03"), indent=2)[:300])
     print("risk:", json.dumps(risk_score_tool("HYD-VALVE-07"), indent=2))
