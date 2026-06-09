@@ -13,6 +13,13 @@ Run:  python -m evals.judges
 from __future__ import annotations
 import sys
 
+# Force UTF-8 stdout so the check/cross marks below don't crash on the default
+# Windows console encoding (cp1252).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 from agent.orchestrator import run_deterministic
 
 CASES = [
@@ -22,7 +29,8 @@ CASES = [
         "expect_asset": "GEARBOX-05",
         "expect_band_in": {"CRITICAL", "HIGH"},
         "expect_constraint_flag": True,      # 45d pinion lead > RUL
-        "expect_tool_called": "alert_dispatch_tool",  # critical -> auto alert
+        "expect_tool_called": "risk_score_tool",
+        "expect_alert_recommended": True,    # CRITICAL -> alert recommended (no side effect)
     },
     {
         "name": "valve-fuzzy-resolution",
@@ -62,6 +70,9 @@ def judge(case):
         "tool_called": case["expect_tool_called"] in tools_called,
         "five_blocks": all(f"### {i}." in res.answer_markdown for i in range(1, 6)),
     }
+    if "expect_alert_recommended" in case:
+        checks["alert_recommended"] = (
+            bool(res.structured.get("alert_recommended")) == case["expect_alert_recommended"])
     return all(checks.values()), checks, res
 
 

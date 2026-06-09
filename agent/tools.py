@@ -304,13 +304,32 @@ def risk_score_tool(asset_id: str) -> dict:
 # TOOL 7: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def alert_dispatch_tool(asset_id: str, risk_level: str, summary: str,
-                        recipients: str = "maintenance-team@plant.local") -> dict:
+                        recipients: str = "maintenance-team@plant.local",
+                        dry_run: bool = False) -> dict:
+    """Dispatch a real-time alert. `dry_run` evaluates the alert without writing
+    (diagnosis stays side-effect-free); live dispatch is de-duplicated so the
+    same asset+band on the same day is not logged twice."""
+    now = datetime.now()
     note = {
-        "ts": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": now.strftime("%Y-%m-%d %H:%M"),
         "asset_id": asset_id, "risk_level": risk_level,
         "summary": summary, "recipients": recipients,
     }
+    if dry_run:
+        return {"dispatched": False, "dry_run": True, **note}
+
     path = os.path.join(C.DATA_DIR, "notifications.jsonl")
+    today = now.strftime("%Y-%m-%d")
+    if os.path.exists(path):  # de-dup: one alert per asset+band+day
+        with open(path) as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except Exception:
+                    continue
+                if (e.get("asset_id") == asset_id and e.get("risk_level") == risk_level
+                        and str(e.get("ts", "")).startswith(today)):
+                    return {"dispatched": False, "deduped": True, **note}
     with open(path, "a") as f:
         f.write(json.dumps(note) + "\n")
     return {"dispatched": True, **note}

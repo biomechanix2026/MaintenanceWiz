@@ -36,7 +36,8 @@ TOOL_FUNCS = {
     "delay_history_tool": lambda a: T.delay_history_tool(a["asset_id"]),
     "risk_score_tool": lambda a: T.risk_score_tool(a["asset_id"]),
     "alert_dispatch_tool": lambda a: T.alert_dispatch_tool(
-        a["asset_id"], a["risk_level"], a["summary"], a.get("recipients", "maintenance-team@plant.local")),
+        a["asset_id"], a["risk_level"], a["summary"], a.get("recipients", "maintenance-team@plant.local"),
+        dry_run=a.get("dry_run", not _ALERTS_LIVE)),
     "task_closure_tool": lambda a: T.task_closure_tool(a["work_order_id"], a.get("checklist")),
     "feedback_tool": lambda a: T.record_feedback(
         a["asset_id"], a.get("work_order_id", ""), a.get("note", ""),
@@ -77,6 +78,12 @@ class AgentResult:
     structured: dict = field(default_factory=dict)  # machine-readable result for logbook/evals
 
 
+# Live-alert toggle. A plain diagnostic query is side-effect-free: alert
+# dispatch is dry-run unless a caller (monitoring / pre-shift) opts in with
+# dispatch_alerts=True. Module-global because Streamlit runs single-threaded.
+_ALERTS_LIVE = False
+
+
 def _dispatch(name, args, trace):
     out = TOOL_FUNCS[name](args)
     trace.append({"tool": name, "input": args, "output": out})
@@ -86,7 +93,10 @@ def _dispatch(name, args, trace):
 # ==========================================================================
 # Deterministic pipeline  (also the reproducible eval baseline)
 # ==========================================================================
-def run_deterministic(query: str, focus_asset: str | None = None) -> AgentResult:
+def run_deterministic(query: str, focus_asset: str | None = None,
+                      dispatch_alerts: bool = False) -> AgentResult:
+    global _ALERTS_LIVE
+    _ALERTS_LIVE = dispatch_alerts
     trace: list = []
     res = AgentResult(answer_markdown="", mode="deterministic", trace=trace)
 
@@ -126,16 +136,25 @@ def run_deterministic(query: str, focus_asset: str | None = None) -> AgentResult
     sops = [h for h in rag["results"] if h["type"] == "manual"]
     probable = incidents[0]["source"] if incidents else "see manual"
 
-    # auto-alert on CRITICAL
+    # Alert decision is computed on every query, but dispatching is a side
+    # effect reserved for opt-in monitoring (dispatch_alerts=True). A plain
+    # diagnostic query only *recommends* the alert.
+    alert_recommended = risk["priority_score"] >= ALERT_THRESHOLD
     alert_line = ""
-    if risk["priority_score"] >= ALERT_THRESHOLD:
+    if alert_recommended:
         summary = f"{aid} {risk['priority_band']} (score {risk['priority_score']}), RUL {prog['rul_days']}d, driver {top}."
-        a = _dispatch("alert_dispatch_tool",
-                      {"asset_id": aid, "risk_level": risk["priority_band"], "summary": summary}, trace)
-        alert_line = f"\n> Auto-alert dispatched to {a['recipients']} at {a['ts']}."
+        if dispatch_alerts:
+            a = _dispatch("alert_dispatch_tool",
+                          {"asset_id": aid, "risk_level": risk["priority_band"], "summary": summary}, trace)
+            alert_line = (f"\n> Auto-alert dispatched to {a['recipients']} at {a['ts']}."
+                          if a.get("dispatched")
+                          else "\n> Auto-alert recommended (already sent today — deduped).")
+        else:
+            alert_line = "\n> **Auto-alert recommended** (CRITICAL) — dispatch on confirmation."
 
     res.structured = {"asset_id": aid, "risk": risk, "prognostic": prog,
-                      "inventory": inv, "delays": delays}
+                      "inventory": inv, "delays": delays,
+                      "alert_recommended": alert_recommended}
     res.answer_markdown = _render(query, aid, prog, shap, top, risk, delays,
                                   inv, sops, incidents, probable, sql, alert_line)
     return res
@@ -221,8 +240,27 @@ def _render(query, aid, prog, shap, top, risk, delays, inv, sops, incidents,
 # ==========================================================================
 # LLM mode (Anthropic tool-use loop) - the production "consolidated brain"
 # ==========================================================================
+def _structured_from_trace(trace: list, asset_id: str | None) -> dict:
+    """Mirror the deterministic `structured` contract from the LLM tool trace so
+    both modes hand the UI/logbook the same machine-readable result."""
+    def last(tool):
+        return next((t["output"] for t in reversed(trace) if t["tool"] == tool), None)
+    risk = last("risk_score_tool") or {}
+    out = {"asset_id": asset_id, "risk": risk,
+           "prognostic": last("prognostic_tool"),
+           "inventory": last("inventory_tool"),
+           "delays": last("delay_history_tool")}
+    if risk.get("priority_score") is not None:
+        out["alert_recommended"] = risk["priority_score"] >= ALERT_THRESHOLD
+    return {k: v for k, v in out.items() if v is not None}
+
+
 def run_llm(query: str, history: list | None = None,
-            model="claude-sonnet-4-6", max_steps=8) -> AgentResult:
+            model="claude-sonnet-4-6", max_steps=8,
+            focus_asset: str | None = None,
+            dispatch_alerts: bool = False) -> AgentResult:
+    global _ALERTS_LIVE
+    _ALERTS_LIVE = dispatch_alerts
     import anthropic
     client = anthropic.Anthropic()
     trace: list = []
@@ -236,7 +274,12 @@ def run_llm(query: str, history: list | None = None,
     while hist and hist[0]["role"] != "user":
         hist = hist[1:]
     messages = [{"role": m["role"], "content": m["content"]} for m in hist]
-    messages.append({"role": "user", "content": query})
+    # Carry the in-focus asset into follow-ups so LLM mode resolves anaphora the
+    # same way deterministic mode does.
+    user_content = query
+    if focus_asset and hist:
+        user_content = f"{query}\n\n(Context: the asset currently in focus is {focus_asset}.)"
+    messages.append({"role": "user", "content": user_content})
 
     for _ in range(max_steps):
         resp = client.messages.create(
@@ -255,29 +298,34 @@ def run_llm(query: str, history: list | None = None,
         else:
             text = "".join(b.text for b in resp.content if b.type == "text")
             aid = next((t["output"].get("asset_id") for t in trace
-                        if t["tool"] == "resolve_asset"), None)
+                        if t["tool"] == "resolve_asset" and t["output"].get("asset_id")),
+                       focus_asset)
             return AgentResult(answer_markdown=text, asset_id=aid, mode="llm",
-                               trace=trace)
-    return AgentResult(answer_markdown="(reached step limit)", mode="llm", trace=trace)
+                               trace=trace, structured=_structured_from_trace(trace, aid))
+    return AgentResult(answer_markdown="(reached step limit)", mode="llm", trace=trace,
+                       structured=_structured_from_trace(trace, focus_asset))
 
 
 def run_agent(query: str, history: list | None = None,
-              focus_asset: str | None = None) -> AgentResult:
+              focus_asset: str | None = None,
+              dispatch_alerts: bool = False) -> AgentResult:
     """Entry point: use Claude if a key is present, else the deterministic pipeline.
 
     `history` is the prior conversation ([{role, content}, ...]) and `focus_asset`
     is the asset currently in focus; both enable context-aware multi-turn
-    follow-ups. Both are optional, so single-shot callers (and the evals) are
-    unaffected.
+    follow-ups. `dispatch_alerts` opts into live alert dispatch (default off, so
+    a diagnostic query is side-effect-free). All optional, so single-shot callers
+    (and the evals) are unaffected.
     """
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            return run_llm(query, history=history)
+            return run_llm(query, history=history, focus_asset=focus_asset,
+                           dispatch_alerts=dispatch_alerts)
         except Exception as e:
-            r = run_deterministic(query, focus_asset=focus_asset)
+            r = run_deterministic(query, focus_asset=focus_asset, dispatch_alerts=dispatch_alerts)
             r.answer_markdown = f"> (LLM mode failed: {type(e).__name__}; used deterministic pipeline)\n\n" + r.answer_markdown
             return r
-    return run_deterministic(query, focus_asset=focus_asset)
+    return run_deterministic(query, focus_asset=focus_asset, dispatch_alerts=dispatch_alerts)
 
 
 if __name__ == "__main__":
