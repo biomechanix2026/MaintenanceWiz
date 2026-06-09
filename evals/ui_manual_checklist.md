@@ -32,10 +32,15 @@ streamlit run app/streamlit_app.py
       `data/notifications.jsonl`, `data/feedback.csv`, `.superpowers/`,
       `docs/deck/slides/`). The repo `.gitignore` already lists these.
 
-## Notes / known gaps surfaced by the automated suites
+## Notes
 
-- **OE-06 user-role-based alerts** — not implemented; `alert_dispatch_tool`
-  accepts an explicit `recipients` string but has no role model. (Reported as a
-  GAP by `tool_contract_tests`.)
-- **DL-02 documentation topics** — README is missing explicit **Assumptions**
-  and **Limitations** sections. (Reported as a GAP by `reporting_tests`.)
+Previously-open gaps now closed (and covered by automated tests):
+
+- **OE-06 user-role-based alerts** — implemented: alerts route by severity to
+  maintenance / reliability / supervisor (`config.ALERT_ROLES`), with explicit
+  `recipients` still honored. Asserted by `tool_contract_tests::OE06`.
+- **DL-02 documentation topics** — README now has **Assumptions** and
+  **Limitations** sections. Asserted by `reporting_tests::DL-02`.
+
+No automated GAPs remain. The boxes above are genuine human/submission steps
+(launch the app; assemble the ZIP; record the screencast).

@@ -71,6 +71,15 @@ PRIORITY_BANDS = [
 # Auto-alert fires at/above this score.
 ALERT_THRESHOLD = 80
 
+# Role-based alert routing (OE-06). When an alert has no explicit recipient,
+# it is routed to a role by severity: critical -> shift supervisor, high ->
+# reliability engineering, otherwise the maintenance team.
+ALERT_ROLES = {
+    "maintenance": "maintenance-team@plant.local",
+    "reliability": "reliability-engineering@plant.local",
+    "supervisor":  "shift-supervisor@plant.local",
+}
+
 # --------------------------------------------------------------------------
 # Independent abnormality detection
 # --------------------------------------------------------------------------

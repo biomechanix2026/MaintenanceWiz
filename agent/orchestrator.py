@@ -37,8 +37,8 @@ TOOL_FUNCS = {
     "delay_history_tool": lambda a: T.delay_history_tool(a["asset_id"]),
     "risk_score_tool": lambda a: T.risk_score_tool(a["asset_id"]),
     "alert_dispatch_tool": lambda a: T.alert_dispatch_tool(
-        a["asset_id"], a["risk_level"], a["summary"], a.get("recipients", "maintenance-team@plant.local"),
-        dry_run=a.get("dry_run", not _ALERTS_LIVE)),
+        a["asset_id"], a["risk_level"], a["summary"], a.get("recipients"),
+        role=a.get("role"), dry_run=a.get("dry_run", not _ALERTS_LIVE)),
     "task_closure_tool": lambda a: T.task_closure_tool(a["work_order_id"], a.get("checklist")),
     "feedback_tool": lambda a: T.record_feedback(
         a["asset_id"], a.get("work_order_id", ""), a.get("note", ""),
@@ -63,8 +63,8 @@ TOOL_SCHEMAS = [
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
     {"name": "risk_score_tool", "description": "Deterministic priority score and constraint flag for an asset.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
-    {"name": "alert_dispatch_tool", "description": "Dispatch a real-time alert for a high-risk asset.",
-     "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}, "risk_level": {"type": "string"}, "summary": {"type": "string"}, "recipients": {"type": "string"}}, "required": ["asset_id", "risk_level", "summary"]}},
+    {"name": "alert_dispatch_tool", "description": "Dispatch a real-time, role-routed alert for a high-risk asset. Omit recipients to auto-route by severity (critical->supervisor, high->reliability, else maintenance); or pass role (maintenance|reliability|supervisor) or an explicit recipients string.",
+     "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}, "risk_level": {"type": "string"}, "summary": {"type": "string"}, "recipients": {"type": "string"}, "role": {"type": "string"}}, "required": ["asset_id", "risk_level", "summary"]}},
     {"name": "task_closure_tool", "description": "Check the compliance checklist for a work order; blocks closure if items missing.",
      "input_schema": {"type": "object", "properties": {"work_order_id": {"type": "string"}, "checklist": {"type": "object"}}, "required": ["work_order_id"]}},
     {"name": "feedback_tool", "description": "Record an engineer correction/confirmation/outcome for an asset so future diagnoses and priority scores improve. Use severity_adjust in [-25,25] when the engineer says the urgency was mis-scored.",

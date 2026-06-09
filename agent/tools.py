@@ -420,16 +420,35 @@ def risk_score_tool(asset_id: str) -> dict:
 # ==========================================================================
 # TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
+def _role_for_band(risk_level: str) -> str:
+    rl = (risk_level or "").upper()
+    if "CRITICAL" in rl:
+        return "supervisor"
+    if rl == "HIGH":
+        return "reliability"
+    return "maintenance"
+
+
 def alert_dispatch_tool(asset_id: str, risk_level: str, summary: str,
-                        recipients: str = "maintenance-team@plant.local",
+                        recipients: str | None = None, role: str | None = None,
                         dry_run: bool = False) -> dict:
-    """Dispatch a real-time alert. `dry_run` evaluates the alert without writing
-    (diagnosis stays side-effect-free); live dispatch is de-duplicated so the
-    same asset+band on the same day is not logged twice."""
+    """Dispatch a real-time, role-routed alert (OE-06).
+
+    Recipient resolution: an explicit `recipients` wins; else an explicit `role`
+    maps via config.ALERT_ROLES; else the role is auto-selected from the risk
+    band (critical -> supervisor, high -> reliability, else maintenance).
+    `dry_run` evaluates the alert without writing (diagnosis stays
+    side-effect-free); live dispatch is de-duplicated so the same asset+band on
+    the same day is not logged twice."""
+    if recipients is None:
+        role = role or _role_for_band(risk_level)
+        recipients = C.ALERT_ROLES.get(role, C.ALERT_ROLES["maintenance"])
+    elif role is None:
+        role = "explicit"
     now = datetime.now()
     note = {
         "ts": now.strftime("%Y-%m-%d %H:%M"),
-        "asset_id": asset_id, "risk_level": risk_level,
+        "asset_id": asset_id, "risk_level": risk_level, "role": role,
         "summary": summary, "recipients": recipients,
     }
     if dry_run:

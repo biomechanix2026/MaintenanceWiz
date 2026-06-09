@@ -165,16 +165,22 @@ def test_OUT18_logbook_closure_gating():
         assert (df["work_order_id"] == "WO-1").any() and (df["asset_id"] == "GEARBOX-05").any()
 
 
-# ---- OE-06: user-role-based alerts (documented gap) -----------------------
+# ---- OE-06: user-role-based alerts ----------------------------------------
 @suite.case
 def test_OE06_role_based_alerts():
-    # alert_dispatch_tool accepts an explicit recipients string but has no role
-    # model. Documented as not-implemented per the test design.
-    import inspect
-    params = inspect.signature(T.alert_dispatch_tool).parameters
-    assert "recipients" in params, "recipients param expected"
-    if "role" not in params:
-        gap("no role model — alerts accept explicit recipients only (OE-06 not implemented)")
+    # explicit role routes to that role's recipient
+    sup = T.alert_dispatch_tool("GEARBOX-05", "CRITICAL", "t", role="supervisor", dry_run=True)
+    assert sup["role"] == "supervisor", sup
+    assert sup["recipients"] == C.ALERT_ROLES["supervisor"], sup
+    # no recipients/role + CRITICAL band -> auto-routes to supervisor
+    auto_crit = T.alert_dispatch_tool("GEARBOX-05", "CRITICAL", "t", dry_run=True)
+    assert auto_crit["role"] == "supervisor" and auto_crit["recipients"] == C.ALERT_ROLES["supervisor"]
+    # low/medium band -> maintenance team
+    auto_low = T.alert_dispatch_tool("CRANE-06", "MEDIUM", "t", dry_run=True)
+    assert auto_low["role"] == "maintenance" and auto_low["recipients"] == C.ALERT_ROLES["maintenance"]
+    # explicit recipients still honored (backward compatible)
+    expl = T.alert_dispatch_tool("PUMP-12", "HIGH", "t", recipients="ops@plant.local", dry_run=True)
+    assert expl["recipients"] == "ops@plant.local", expl
 
 
 if __name__ == "__main__":
