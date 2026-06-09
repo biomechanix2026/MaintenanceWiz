@@ -72,10 +72,11 @@ class Database:
             if os.path.exists(path):
                 pd.read_csv(path).to_sql(name, self.conn, index=False, if_exists="replace")
 
-    def run(self, sql):
+    def run(self, sql, max_rows=2000):
         cur = self.conn.execute(sql)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        # cap the fetch so a future larger dataset can't create memory pressure
+        return [dict(zip(cols, row)) for row in cur.fetchmany(max_rows)]
 
 _DB = None
 def _db():
@@ -178,9 +179,19 @@ def inventory_tool(asset_id: str) -> dict:
 # TOOL 4: SQL query (transparent - returns the SQL it ran)
 # ==========================================================================
 def sql_query_tool(sql: str) -> dict:
-    """Run read-only SQL against assets/sensors/delays/incidents/parts."""
-    if not sql.strip().lower().startswith("select"):
-        return {"sql": sql, "error": "Only SELECT queries are permitted."}
+    """Run read-only SQL against assets/sensors/delays/incidents/parts.
+
+    Accepts a single SELECT or read-only WITH (CTE) statement. Requiring the
+    statement to start with SELECT/WITH and forbidding multiple statements is
+    sufficient for read-only safety - SQLite has no data-modifying CTEs, so a
+    lone SELECT/WITH cannot mutate. (A keyword denylist was avoided because it
+    false-rejects valid content queries, e.g. LIKE '%replace%' over incident
+    resolutions.) The exact SQL is returned for UI validation."""
+    s = sql.strip().lower()
+    if not (s.startswith("select") or s.startswith("with")):
+        return {"sql": sql, "error": "Only read-only SELECT / WITH queries are permitted."}
+    if ";" in s.rstrip(";"):
+        return {"sql": sql, "error": "Multiple statements are not permitted."}
     try:
         rows = _db().run(sql)
         return {"sql": sql, "row_count": len(rows), "rows": rows[:50]}

@@ -155,6 +155,24 @@ class RAG:
         return self.backend.query(text, asset_id=asset_id, k=k)
 
 
+class _ChromaBackend:
+    """Query wrapper over a Chroma collection (works for both freshly built and
+    already-persisted collections, so loading never has to rebuild)."""
+    def __init__(self, col):
+        self.col = col
+
+    def query(self, text, asset_id=None, k=4):
+        where = {"asset_id": asset_id} if asset_id else None
+        res = self.col.query(query_texts=[text], n_results=k, where=where)
+        out = []
+        for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0],
+                                   res["distances"][0]):
+            out.append({"asset_id": meta["asset_id"], "source": meta["source"],
+                        "type": meta["type"], "text": doc,
+                        "score": round(1 - dist, 4)})
+        return out
+
+
 def _build_chroma(chunks):
     import chromadb
     os.makedirs(VECTORSTORE_DIR, exist_ok=True)
@@ -170,19 +188,7 @@ def _build_chroma(chunks):
         metadatas=[{"asset_id": c["asset_id"], "source": c["source"], "type": c["type"]}
                    for c in chunks],
     )
-
-    class _ChromaBackend:
-        def query(self, text, asset_id=None, k=4):
-            where = {"asset_id": asset_id} if asset_id else None
-            res = col.query(query_texts=[text], n_results=k, where=where)
-            out = []
-            for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0],
-                                       res["distances"][0]):
-                out.append({"asset_id": meta["asset_id"], "source": meta["source"],
-                            "type": meta["type"], "text": doc,
-                            "score": round(1 - dist, 4)})
-            return out
-    return _ChromaBackend()
+    return _ChromaBackend(col)
 
 
 def build_index(prefer_chroma=True) -> RAG:
@@ -200,12 +206,17 @@ def build_index(prefer_chroma=True) -> RAG:
 
 
 def load_index() -> RAG:
-    """Load a previously built index, preferring Chroma, else TF-IDF, else build."""
+    """Load a previously built index, preferring Chroma, else TF-IDF, else build.
+
+    Loading is non-destructive: an existing Chroma collection is wrapped and
+    reused as-is (no delete/rebuild). Building happens only when nothing exists.
+    """
     try:
         import chromadb
         client = chromadb.PersistentClient(path=VECTORSTORE_DIR)
-        client.get_collection("maintenance")
-        return build_index(prefer_chroma=True)
+        col = client.get_collection("maintenance")
+        if col.count() > 0:
+            return RAG(_ChromaBackend(col), "chromadb")
     except Exception:
         pass
     if os.path.exists(_TFIDF_PATH):
