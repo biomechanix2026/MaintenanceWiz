@@ -178,8 +178,10 @@ def _render(query, aid, prog, shap, top, risk, delays, inv, sops, incidents,
     sop_md = "\n".join(f"   - {h['source']}" for h in sops[:2]) or "   - No SOP section matched."
 
     fb_n = risk.get("feedback_count", 0)
-    fb_md = (f"\n- **Continuous learning:** incorporated **{fb_n}** engineer feedback "
-             f"record(s) on this asset (priority Δ {risk.get('learned_adjustment', 0):+.1f})."
+    fb_md = (f"\n- **Continuous learning:** {fb_n} engineer feedback record(s) on this "
+             f"asset re-indexed as advisory context"
+             + (f" (priority Δ applied: {risk.get('learned_adjustment', 0):+.1f})."
+                if risk.get("feedback_bias_applied") else " (priority score unaffected).")
              if fb_n else "")
 
     md = f"""### 1. Operational Risk Assessment

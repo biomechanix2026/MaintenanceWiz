@@ -230,8 +230,10 @@ def learned_bias(asset_id: str) -> tuple[float, int]:
         fb = pd.read_csv(C.FEEDBACK_CSV)
     except Exception:
         return 0.0, 0
-    g = fb[fb.get("asset_id") == asset_id]
-    if g.empty or "severity_adjust" not in g:
+    if "asset_id" not in fb.columns or "severity_adjust" not in fb.columns:
+        return 0.0, 0
+    g = fb[fb["asset_id"] == asset_id]
+    if g.empty:
         return 0.0, 0
     adj = float(pd.to_numeric(g["severity_adjust"], errors="coerce").fillna(0).mean())
     return max(-25.0, min(25.0, adj)), int(len(g))
@@ -265,9 +267,12 @@ def risk_score_tool(asset_id: str) -> dict:
         RISK_WEIGHTS["spares"] * spares_score
     )
 
-    # feedback-driven correction: nudge the score by what engineers have learned
-    # us about this asset (0 when there is no feedback -> baseline unchanged).
-    bias, fb_count = learned_bias(asset_id)
+    # feedback-driven correction: engineers' learned adjustment for this asset.
+    # Applied to the headline score ONLY when explicitly enabled (off by
+    # default) so priority stays grounded in the stated basis - RUL,
+    # criticality, delay history, spares/lead time - and reproducible.
+    raw_bias, fb_count = learned_bias(asset_id)
+    bias = raw_bias if C.APPLY_FEEDBACK_BIAS else 0.0
     score = round(max(0.0, min(100.0, base_score + bias)), 1)
 
     # constraint-aware flag: can we fix before it fails?
@@ -278,7 +283,9 @@ def risk_score_tool(asset_id: str) -> dict:
         "priority_score": score,
         "priority_band": _band(score),
         "base_score": round(base_score, 1),
-        "learned_adjustment": round(bias, 1),
+        "learned_adjustment": round(bias, 1),          # actually applied (0 unless enabled)
+        "learned_adjustment_available": round(raw_bias, 1),
+        "feedback_bias_applied": C.APPLY_FEEDBACK_BIAS,
         "feedback_count": fb_count,
         "components": {
             "rul_score": round(rul_score, 2), "criticality_score": round(crit_score, 2),

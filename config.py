@@ -70,3 +70,13 @@ PRIORITY_BANDS = [
 
 # Auto-alert fires at/above this score.
 ALERT_THRESHOLD = 80
+
+# --------------------------------------------------------------------------
+# Feedback loop policy
+# --------------------------------------------------------------------------
+# Engineer feedback ALWAYS re-indexes into the RAG corpus (advisory context).
+# Whether it may also nudge the deterministic priority_score is opt-in and OFF
+# by default, so the headline score stays grounded purely in the stated
+# prioritisation basis (RUL, criticality, delay history, spares/lead time) and
+# remains reproducible for the eval baseline. Enable with MW_APPLY_FEEDBACK_BIAS=1.
+APPLY_FEEDBACK_BIAS = os.environ.get("MW_APPLY_FEEDBACK_BIAS", "0") == "1"
