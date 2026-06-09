@@ -11,20 +11,24 @@ Produces an asset-tagged dataset for a heavy steel manufacturing plant:
   - manuals/                 : per-asset SOP/manual markdown (RAG corpus)
 
 Every row is tagged with an `asset_id` so the whole system stays asset-centric.
+All file I/O lives in main(), so importing this module is side-effect-free.
 Run:  python data/generate_mock_data.py
 """
 from __future__ import annotations
 import csv
 import json
 import os
+import sys
 import random
 from datetime import datetime, timedelta
 
-random.seed(42)
+# NOMINAL baselines are owned by config.py (single source of truth) so the
+# generated data, the trained model and inference never disagree.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import NOMINAL
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MANUALS_DIR = os.path.join(HERE, "manuals")
-os.makedirs(MANUALS_DIR, exist_ok=True)
 
 # --------------------------------------------------------------------------
 # 1. Asset registry  (the canonical spine of the Semantic Layer)
@@ -47,15 +51,7 @@ ASSETS = [
 ]
 
 ASSET_IDS = [a[0] for a in ASSETS]
-
-with open(os.path.join(HERE, "asset_registry.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["asset_id", "name", "type", "line", "criticality", "install_date", "manufacturer"])
-    mfrs = ["Siemens VAI", "Danieli", "SMS Group", "Primetals", "ABB", "Flowserve"]
-    for aid, name, typ, line, crit in ASSETS:
-        install = datetime(2015, 1, 1) + timedelta(days=random.randint(0, 2500))
-        w.writerow([aid, name, typ, line, crit, install.strftime("%Y-%m-%d"),
-                    random.choice(mfrs)])
+TYPE_OF = {a[0]: a[2] for a in ASSETS}
 
 # --------------------------------------------------------------------------
 # 2. Alias dictionary  (fuzzy / jargon resolution -> formal asset_id)
@@ -93,35 +89,18 @@ ALIASES = {
     "eot crane": "CRANE-06",
     "charge crane": "CRANE-06",
 }
-with open(os.path.join(HERE, "aliases.json"), "w") as f:
-    json.dump(ALIASES, f, indent=2)
 
 # --------------------------------------------------------------------------
-# 3. Sensor logs (the ML input). Each asset has a "health" trajectory.
-# --------------------------------------------------------------------------
-# We give each asset a hidden degradation state so the ML model has signal.
+# 3. Hidden health states (drive the sensor degradation trajectories).
 # Features: temperature(C), vibration(mm/s), pressure(bar), humidity(%), power(kW)
-# Label (computed later in train_model): remaining useful life (days).
-
-# Per-type nominal operating points (mean, std) for healthy operation.
-NOMINAL = {
-    "furnace":    {"temperature": (640, 25), "vibration": (2.0, 0.4), "pressure": (3.0, 0.3), "humidity": (28, 4), "power": (820, 40)},
-    "conveyor":   {"temperature": (55, 6),   "vibration": (3.5, 0.6), "pressure": (1.2, 0.2), "humidity": (45, 6), "power": (110, 12)},
-    "pump":       {"temperature": (62, 7),   "vibration": (2.8, 0.5), "pressure": (6.5, 0.5), "humidity": (40, 5), "power": (160, 15)},
-    "valve":      {"temperature": (58, 6),   "vibration": (1.8, 0.3), "pressure": (180, 12), "humidity": (35, 5), "power": (12, 2)},
-    "mill":       {"temperature": (78, 8),   "vibration": (4.2, 0.8), "pressure": (210, 15), "humidity": (38, 5), "power": (1450, 70)},
-    "gearbox":    {"temperature": (70, 7),   "vibration": (3.0, 0.6), "pressure": (4.0, 0.4), "humidity": (33, 4), "power": (480, 30)},
-    "compressor": {"temperature": (66, 6),   "vibration": (2.6, 0.5), "pressure": (9.0, 0.6), "humidity": (42, 5), "power": (240, 20)},
-    "crane":      {"temperature": (48, 5),   "vibration": (2.2, 0.5), "pressure": (2.5, 0.3), "humidity": (44, 6), "power": (95, 10)},
-}
-
-# Hidden health 0..1 (1 = perfect). Degraded assets drift sensors upward.
+# NOMINAL operating points come from config.py.
+# --------------------------------------------------------------------------
 HEALTH = {
     "FURNACE-01": 0.85, "LADLE-02": 0.92, "CONV-BELT-03": 0.18, "CONV-BELT-08": 0.74,
     "PUMP-12": 0.38, "PUMP-19": 0.66, "HYD-VALVE-07": 0.30, "ROLL-MILL-04": 0.42,
     "ROLL-MILL-11": 0.80, "GEARBOX-05": 0.28, "COMPRESSOR-09": 0.71, "CRANE-06": 0.88,
 }
-TYPE_OF = {a[0]: a[2] for a in ASSETS}
+
 
 def degraded(value_mean, value_std, health, factor):
     """Lower health -> higher mean + higher variance (more erratic)."""
@@ -129,36 +108,9 @@ def degraded(value_mean, value_std, health, factor):
     noise = random.gauss(0, value_std * (1 + (1 - health)))
     return round(value_mean * (1 + drift) + noise, 2)
 
-rows = []
-now = datetime(2026, 6, 6, 6, 0, 0)
-for aid in ASSET_IDS:
-    typ = TYPE_OF[aid]
-    nom = NOMINAL[typ]
-    h = HEALTH[aid]
-    # 120 hourly readings per asset (most recent last)
-    N = 120
-    for i in range(N):
-        ts = now - timedelta(hours=(N - i))
-        # health slowly decays across the window for unhealthy assets
-        h_t = max(0.05, h - (N - i) * 0.0020 * (1 - h))
-        rows.append([
-            ts.strftime("%Y-%m-%d %H:%M"), aid,
-            degraded(*nom["temperature"], h_t, 0.45),
-            degraded(*nom["vibration"], h_t, 1.20),
-            degraded(*nom["pressure"], h_t, 0.15),
-            round(random.gauss(nom["humidity"][0], nom["humidity"][1]), 1),
-            degraded(*nom["power"], h_t, 0.25),
-            round(h_t, 3),
-        ])
-
-with open(os.path.join(HERE, "sensor_logs.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["timestamp", "asset_id", "temperature", "vibration",
-                "pressure", "humidity", "power", "health_index"])
-    w.writerows(rows)
 
 # --------------------------------------------------------------------------
-# 4. Delay logs (production impact tied to assets)
+# 4. Delay-log taxonomy
 # --------------------------------------------------------------------------
 DELAY_CODES = {
     "MECH": "Mechanical failure",
@@ -168,21 +120,6 @@ DELAY_CODES = {
     "WEAR": "Component wear",
     "PROC": "Process upset",
 }
-with open(os.path.join(HERE, "delay_logs.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["delay_id", "asset_id", "date", "delay_code", "delay_desc",
-                "downtime_min", "tonnage_lost"])
-    did = 1000
-    for aid in ASSET_IDS:
-        # unhealthy assets generate more delays
-        n = int(round((1 - HEALTH[aid]) * 8)) + random.randint(0, 2)
-        for _ in range(n):
-            d = now - timedelta(days=random.randint(1, 120))
-            code = random.choice(list(DELAY_CODES))
-            dt = random.randint(15, 320)
-            w.writerow([f"DLY-{did}", aid, d.strftime("%Y-%m-%d"), code,
-                        DELAY_CODES[code], dt, round(dt * random.uniform(0.4, 1.8), 1)])
-            did += 1
 
 # --------------------------------------------------------------------------
 # 5. Incident / failure-analysis records (historical root causes)
@@ -199,12 +136,6 @@ INCIDENTS = [
     ("FURNACE-01", "Electrode arm overheating", "Clamp contact resistance rose, arm temperature elevated.", "Cleaned clamp contacts, retorqued to spec."),
     ("PUMP-19", "Coupling wear", "Elastomeric coupling degraded, vibration rose on caster supply.", "Replaced coupling element, re-aligned to 0.05mm."),
 ]
-with open(os.path.join(HERE, "incident_records.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["incident_id", "asset_id", "title", "root_cause", "resolution", "date"])
-    for i, (aid, title, rc, res) in enumerate(INCIDENTS, start=1):
-        d = now - timedelta(days=random.randint(40, 700))
-        w.writerow([f"INC-{200 + i}", aid, title, rc, res, d.strftime("%Y-%m-%d")])
 
 # --------------------------------------------------------------------------
 # 6. Spare parts inventory (ERP: stock + procurement lead times)
@@ -224,12 +155,6 @@ PARTS = [
     ("ELEC-CLMP1", "FURNACE-01",   "Electrode clamp contact pad",      6, 3, 14, 540),
     ("FILT-10MIC", "HYD-VALVE-07", "10-micron hydraulic filter",       8, 4, 3,  85),
 ]
-with open(os.path.join(HERE, "spare_parts_inventory.csv"), "w", newline="") as f:
-    w = csv.writer(f)
-    w.writerow(["part_no", "asset_id", "description", "qty_on_hand",
-                "reorder_point", "lead_time_days", "unit_cost_usd"])
-    for p in PARTS:
-        w.writerow(list(p))
 
 # --------------------------------------------------------------------------
 # 7. Per-asset manuals / SOPs (the RAG corpus, asset-tagged markdown)
@@ -410,18 +335,102 @@ GENERIC = """
 3. Escalate to specialist if outside limits; do not run to failure.
 """
 
-for aid in ASSET_IDS:
-    if aid in MANUALS:
-        title, body = MANUALS[aid]
-    else:
-        name = next(a[1] for a in ASSETS if a[0] == aid)
-        title, body = f"{name} - Maintenance Manual", GENERIC
-    with open(os.path.join(MANUALS_DIR, f"{aid}.md"), "w") as f:
-        f.write(f"# {title}\n\n*Asset ID: {aid}*\n{body}")
 
-print("Mock data generated:")
-for fn in ["asset_registry.csv", "aliases.json", "sensor_logs.csv", "delay_logs.csv",
-           "incident_records.csv", "spare_parts_inventory.csv"]:
-    p = os.path.join(HERE, fn)
-    print(f"  {fn:28s} {os.path.getsize(p):>7} bytes")
-print(f"  manuals/                     {len(os.listdir(MANUALS_DIR))} files")
+def main():
+    """Write all dataset artifacts. Side effects are confined here."""
+    random.seed(42)
+    os.makedirs(MANUALS_DIR, exist_ok=True)
+
+    # 1. Asset registry
+    with open(os.path.join(HERE, "asset_registry.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["asset_id", "name", "type", "line", "criticality", "install_date", "manufacturer"])
+        mfrs = ["Siemens VAI", "Danieli", "SMS Group", "Primetals", "ABB", "Flowserve"]
+        for aid, name, typ, line, crit in ASSETS:
+            install = datetime(2015, 1, 1) + timedelta(days=random.randint(0, 2500))
+            w.writerow([aid, name, typ, line, crit, install.strftime("%Y-%m-%d"),
+                        random.choice(mfrs)])
+
+    # 2. Aliases
+    with open(os.path.join(HERE, "aliases.json"), "w") as f:
+        json.dump(ALIASES, f, indent=2)
+
+    # 3. Sensor logs (each asset has a hidden degradation trajectory)
+    rows = []
+    now = datetime(2026, 6, 6, 6, 0, 0)
+    for aid in ASSET_IDS:
+        typ = TYPE_OF[aid]
+        nom = NOMINAL[typ]
+        h = HEALTH[aid]
+        N = 120  # 120 hourly readings per asset (most recent last)
+        for i in range(N):
+            ts = now - timedelta(hours=(N - i))
+            # health slowly decays across the window for unhealthy assets
+            h_t = max(0.05, h - (N - i) * 0.0020 * (1 - h))
+            rows.append([
+                ts.strftime("%Y-%m-%d %H:%M"), aid,
+                degraded(*nom["temperature"], h_t, 0.45),
+                degraded(*nom["vibration"], h_t, 1.20),
+                degraded(*nom["pressure"], h_t, 0.15),
+                round(random.gauss(nom["humidity"][0], nom["humidity"][1]), 1),
+                degraded(*nom["power"], h_t, 0.25),
+                round(h_t, 3),
+            ])
+    with open(os.path.join(HERE, "sensor_logs.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["timestamp", "asset_id", "temperature", "vibration",
+                    "pressure", "humidity", "power", "health_index"])
+        w.writerows(rows)
+
+    # 4. Delay logs (unhealthy assets generate more delays)
+    with open(os.path.join(HERE, "delay_logs.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["delay_id", "asset_id", "date", "delay_code", "delay_desc",
+                    "downtime_min", "tonnage_lost"])
+        did = 1000
+        for aid in ASSET_IDS:
+            n = int(round((1 - HEALTH[aid]) * 8)) + random.randint(0, 2)
+            for _ in range(n):
+                d = now - timedelta(days=random.randint(1, 120))
+                code = random.choice(list(DELAY_CODES))
+                dt = random.randint(15, 320)
+                w.writerow([f"DLY-{did}", aid, d.strftime("%Y-%m-%d"), code,
+                            DELAY_CODES[code], dt, round(dt * random.uniform(0.4, 1.8), 1)])
+                did += 1
+
+    # 5. Incident / failure-analysis records
+    with open(os.path.join(HERE, "incident_records.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["incident_id", "asset_id", "title", "root_cause", "resolution", "date"])
+        for i, (aid, title, rc, res) in enumerate(INCIDENTS, start=1):
+            d = now - timedelta(days=random.randint(40, 700))
+            w.writerow([f"INC-{200 + i}", aid, title, rc, res, d.strftime("%Y-%m-%d")])
+
+    # 6. Spare parts inventory
+    with open(os.path.join(HERE, "spare_parts_inventory.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["part_no", "asset_id", "description", "qty_on_hand",
+                    "reorder_point", "lead_time_days", "unit_cost_usd"])
+        for p in PARTS:
+            w.writerow(list(p))
+
+    # 7. Per-asset manuals / SOPs
+    for aid in ASSET_IDS:
+        if aid in MANUALS:
+            title, body = MANUALS[aid]
+        else:
+            name = next(a[1] for a in ASSETS if a[0] == aid)
+            title, body = f"{name} - Maintenance Manual", GENERIC
+        with open(os.path.join(MANUALS_DIR, f"{aid}.md"), "w") as f:
+            f.write(f"# {title}\n\n*Asset ID: {aid}*\n{body}")
+
+    print("Mock data generated:")
+    for fn in ["asset_registry.csv", "aliases.json", "sensor_logs.csv", "delay_logs.csv",
+               "incident_records.csv", "spare_parts_inventory.csv"]:
+        p = os.path.join(HERE, fn)
+        print(f"  {fn:28s} {os.path.getsize(p):>7} bytes")
+    print(f"  manuals/                     {len(os.listdir(MANUALS_DIR))} files")
+
+
+if __name__ == "__main__":
+    main()
