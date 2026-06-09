@@ -88,7 +88,7 @@ def run():
         lines.append("")
 
     path = os.path.join(REPORTS_DIR, f"preshift_{ts:%Y%m%d_%H%M}.md")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:  # report contains non-ASCII (⚠️/📧)
         f.write("\n".join(lines))
     print(f"Pre-shift briefing written: {path}")
     print(f"  {len(crit)} critical, {len(high)} high, {len(abnormal)} abnormal, "
