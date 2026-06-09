@@ -1,0 +1,11 @@
+incident_id,asset_id,title,root_cause,resolution,date
+INC-201,CONV-BELT-03,Drive bearing seizure,Bearing ran dry due to blocked grease line; vibration climbed for 6 days before seizure.,"Replaced bearing, cleared grease line, added vibration alarm at 6.0 mm/s.",2025-05-13
+INC-202,CONV-BELT-03,Belt mistracking,Idler misalignment caused edge wear and repeated trips.,"Re-aligned idlers, replaced 12m belt section.",2025-10-16
+INC-203,PUMP-12,Mechanical seal failure,Seal face wear allowed coolant leak; temperature rose 18%.,"Replaced cartridge seal, flushed cooling jacket.",2024-12-26
+INC-204,PUMP-12,Impeller cavitation,"Suction strainer fouling dropped inlet pressure, cavitation pitted impeller.","Cleaned strainer, balanced and refit impeller.",2025-01-04
+INC-205,HYD-VALVE-07,Spool sticking,"Contaminated oil caused mold valve spool to stick, casting defects appeared.","Replaced spool, fitted 10-micron filter, drained reservoir.",2024-08-21
+INC-206,HYD-VALVE-07,Internal leakage,Worn seals caused pressure droop and slow mold oscillation.,"Reseal kit fitted, verified oscillation profile.",2025-05-23
+INC-207,GEARBOX-05,Tooth pitting,Oil analysis showed iron particles; pinion pitting from overload.,"Replaced pinion, switched to ISO VG320 oil, set load trip.",2024-09-12
+INC-208,ROLL-MILL-04,Work roll thermal crack,"Cooling spray header partially blocked, roll surface cracked.","Reground roll, cleared spray header nozzles.",2024-09-25
+INC-209,FURNACE-01,Electrode arm overheating,"Clamp contact resistance rose, arm temperature elevated.","Cleaned clamp contacts, retorqued to spec.",2025-05-19
+INC-210,PUMP-19,Coupling wear,"Elastomeric coupling degraded, vibration rose on caster supply.","Replaced coupling element, re-aligned to 0.05mm.",2024-08-05

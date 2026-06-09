@@ -1,0 +1,11 @@
+{
+  "features": [
+    "temperature",
+    "vibration",
+    "pressure",
+    "humidity",
+    "power"
+  ],
+  "kind": "numpy-forest",
+  "max_rul_days": 120
+}

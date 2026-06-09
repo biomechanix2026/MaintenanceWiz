@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp \"C:/Users/bioro/AppData/Roaming/Claude/local-agent-mode-sessions/0a790fe6-14a7-47bc-a548-1719b5fe3da8/fcfa9833-891c-4220-9332-285aea9df399/rpm/plugin_014WxCYbLf7f3uw2isHFR9US/skills/dashboard.html\" \"C:/Users/bioro/OneDrive/Documents/VSRepositories/MaintenanceWiz_1/dashboard.html\" && ls -la \"C:/Users/bioro/OneDrive/Documents/VSRepositories/MaintenanceWiz_1/dashboard.html\")"
+    ]
+  }
+}

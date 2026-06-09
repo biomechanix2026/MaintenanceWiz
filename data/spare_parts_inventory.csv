@@ -1,0 +1,13 @@
+part_no,asset_id,description,qty_on_hand,reorder_point,lead_time_days,unit_cost_usd
+BRG-6314,CONV-BELT-03,Drive-end roller bearing 6314,0,2,21,480
+BELT-SNT-3,CONV-BELT-03,Sinter belt section 12m,1,1,35,5200
+SEAL-CART-12,PUMP-12,Cartridge mechanical seal 65mm,3,2,7,920
+IMP-12,PUMP-12,Closed impeller 65mm,1,1,28,2400
+SPOOL-HV7,HYD-VALVE-07,Proportional valve spool kit,0,1,18,1650
+RESEAL-HV7,HYD-VALVE-07,Valve reseal kit,4,2,5,210
+PINION-G5,GEARBOX-05,Drive pinion 22T,0,1,45,7800
+OIL-VG320,GEARBOX-05,ISO VG320 gear oil 200L,2,2,4,640
+ROLL-WR4,ROLL-MILL-04,Work roll forged,1,1,60,22000
+CPLG-19,PUMP-19,Elastomeric coupling element,5,2,6,180
+ELEC-CLMP1,FURNACE-01,Electrode clamp contact pad,6,3,14,540
+FILT-10MIC,HYD-VALVE-07,10-micron hydraulic filter,8,4,3,85

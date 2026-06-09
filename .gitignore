@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+reports/
+data/notifications.jsonl
+data/digital_logbook.csv
+data/feedback.csv
+.superpowers/
+docs/deck/slides/

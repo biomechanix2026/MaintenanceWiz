@@ -1,0 +1,17 @@
+# --- Core (required) ---
+numpy
+pandas
+streamlit
+
+# --- Production ML / RAG / Agent (recommended) ---
+# The system runs WITHOUT these via pure-numpy/stdlib fallbacks, but installing
+# them upgrades to the full production stack (sklearn RF + TreeSHAP + ChromaDB +
+# Claude tool-use). Re-run `python ml/train_model.py` after installing sklearn
+# to produce a RandomForest artifact instead of the numpy fallback forest.
+scikit-learn
+shap
+chromadb
+anthropic
+
+# --- Optional viz niceties ---
+matplotlib

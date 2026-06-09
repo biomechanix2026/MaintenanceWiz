@@ -1,0 +1,122 @@
+<svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5B7085"/></marker>
+    <marker id="ahb" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2B6CB0"/></marker>
+    <marker id="ahs" markerWidth="9" markerHeight="9" refX="1" refY="3" orient="auto"><path d="M7,0 L0,3 L7,6 Z" fill="#2B6CB0"/></marker>
+    <marker id="ahf" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E9488"/></marker>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="540" fill="#FFFFFF"/>
+
+  <!-- Title -->
+  <text x="24" y="34" font-size="22" font-weight="700" fill="#16202E">Maintenance Wizard — Consolidated-Brain Architecture</text>
+  <text x="24" y="54" font-size="12.5" fill="#5B7085">One traceable maintenance decision from five fused data sources · single agent loop · runs anywhere</text>
+
+  <!-- ============ INPUTS (left) ============ -->
+  <text x="24" y="84" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">INPUTS</text>
+  <g>
+    <rect x="24" y="96" width="150" height="74" rx="9" fill="#E8EDF2" stroke="#5B7085"/>
+    <text x="99" y="128" font-size="12.5" font-weight="700" fill="#16202E" text-anchor="middle">Live Sensors</text>
+    <text x="99" y="146" font-size="11" fill="#5B7085" text-anchor="middle">telemetry / condition</text>
+    <text x="99" y="160" font-size="11" fill="#5B7085" text-anchor="middle">monitoring</text>
+  </g>
+  <g>
+    <rect x="24" y="250" width="150" height="74" rx="9" fill="#E8EDF2" stroke="#5B7085"/>
+    <text x="99" y="282" font-size="12.5" font-weight="700" fill="#16202E" text-anchor="middle">Maintenance Engineer</text>
+    <text x="99" y="300" font-size="11" fill="#5B7085" text-anchor="middle">natural-language</text>
+    <text x="99" y="314" font-size="11" fill="#5B7085" text-anchor="middle">multi-turn queries</text>
+  </g>
+
+  <!-- ============ CONSOLIDATED BRAIN (center top) ============ -->
+  <rect x="196" y="72" width="420" height="200" rx="12" fill="#EAF2FB" stroke="#2B6CB0" stroke-width="2"/>
+  <text x="406" y="94" font-size="14.5" font-weight="700" fill="#16202E" text-anchor="middle">THE CONSOLIDATED BRAIN</text>
+  <text x="406" y="111" font-size="10.7" fill="#5B7085" text-anchor="middle">single think → act → observe loop · full tool suite · no sub-agents</text>
+
+  <!-- dual mode pill -->
+  <rect x="214" y="120" width="384" height="26" rx="13" fill="#FFFFFF" stroke="#2B6CB0"/>
+  <text x="406" y="137" font-size="11" font-weight="600" fill="#2B6CB0" text-anchor="middle">LLM mode (Claude tool-use)　⇄　Deterministic pipeline (offline fallback)</text>
+
+  <!-- tool chips grid 3x4 -->
+  <!-- row1 -->
+  <g font-size="10.3" font-family="Consolas, monospace" fill="#1B3A5B">
+    <rect x="208" y="154" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="270" y="170" text-anchor="middle">resolve_asset</text>
+    <rect x="344" y="154" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="406" y="170" text-anchor="middle">prognostic_tool</text>
+    <rect x="480" y="154" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="542" y="170" text-anchor="middle">rag_tool</text>
+    <!-- row2 -->
+    <rect x="208" y="183" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="270" y="199" text-anchor="middle">inventory_tool</text>
+    <rect x="344" y="183" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="406" y="199" text-anchor="middle">sql_query_tool</text>
+    <rect x="480" y="183" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="542" y="199" text-anchor="middle">delay_history</text>
+    <!-- row3 -->
+    <rect x="208" y="212" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="270" y="228" text-anchor="middle">risk_score_tool</text>
+    <rect x="344" y="212" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="406" y="228" text-anchor="middle">alert_dispatch</text>
+    <rect x="480" y="212" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="542" y="228" text-anchor="middle">task_closure</text>
+    <!-- row4 -->
+    <rect x="208" y="241" width="124" height="24" rx="6" fill="#FFFFFF" stroke="#BBD0E6"/><text x="270" y="257" text-anchor="middle">feedback_tool</text>
+    <rect x="344" y="241" width="124" height="24" rx="6" fill="#EAF2FB" stroke="#9CC0E6" stroke-dasharray="3 2"/><text x="406" y="257" text-anchor="middle">cascade_tool*</text>
+    <rect x="480" y="241" width="124" height="24" rx="6" fill="#F1F5F9" stroke="#CBD5E1"/><text x="542" y="257" fill="#7A8AA0" text-anchor="middle">structured I/O</text>
+  </g>
+
+  <!-- ============ ENGINES (center bottom) ============ -->
+  <text x="196" y="296" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">SMART-TOOL ENGINES</text>
+  <g>
+    <rect x="196" y="306" width="204" height="92" rx="9" fill="#F1F5F9" stroke="#5B7085"/>
+    <text x="298" y="328" font-size="12.5" font-weight="700" fill="#16202E" text-anchor="middle">Prognostic ML</text>
+    <text x="298" y="346" font-size="10.5" fill="#5B7085" text-anchor="middle">RUL + failure prob + SHAP</text>
+    <text x="298" y="366" font-size="10.3" fill="#2B6CB0" text-anchor="middle">RandomForest</text>
+    <text x="298" y="382" font-size="10" fill="#7A8AA0" text-anchor="middle">↳ NumpyForest fallback · ablation SHAP</text>
+  </g>
+  <g>
+    <rect x="412" y="306" width="204" height="92" rx="9" fill="#F1F5F9" stroke="#5B7085"/>
+    <text x="514" y="328" font-size="12.5" font-weight="700" fill="#16202E" text-anchor="middle">Asset-filtered RAG</text>
+    <text x="514" y="346" font-size="10.5" fill="#5B7085" text-anchor="middle">SOPs · manuals · incidents</text>
+    <text x="514" y="366" font-size="10.3" fill="#2B6CB0" text-anchor="middle">ChromaDB</text>
+    <text x="514" y="382" font-size="10" fill="#7A8AA0" text-anchor="middle">↳ TF-IDF cosine fallback</text>
+  </g>
+
+  <!-- ============ SYSTEMS OF RECORD (right) ============ -->
+  <text x="640" y="84" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">SYSTEMS OF RECORD</text>
+  <g font-size="11.5" fill="#16202E">
+    <rect x="640" y="92" width="184" height="52" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="732" y="114" font-weight="700" text-anchor="middle">Asset registry + aliases</text><text x="732" y="131" font-size="10" fill="#5B7085" text-anchor="middle">semantic layer · fuzzy resolve</text>
+    <rect x="640" y="152" width="184" height="52" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="732" y="174" font-weight="700" text-anchor="middle">Manuals / SOPs</text><text x="732" y="191" font-size="10" fill="#5B7085" text-anchor="middle">keyed by asset_id</text>
+    <rect x="640" y="212" width="184" height="52" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="732" y="234" font-weight="700" text-anchor="middle">Delay logs</text><text x="732" y="251" font-size="10" fill="#5B7085" text-anchor="middle">downtime · tonnage lost</text>
+    <rect x="640" y="272" width="184" height="52" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="732" y="294" font-weight="700" text-anchor="middle">Incident records</text><text x="732" y="311" font-size="10" fill="#5B7085" text-anchor="middle">failure analysis · root cause</text>
+    <rect x="640" y="332" width="184" height="52" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="732" y="354" font-weight="700" text-anchor="middle">ERP spares inventory</text><text x="732" y="371" font-size="10" fill="#5B7085" text-anchor="middle">stock · lead time · cost</text>
+  </g>
+  <text x="732" y="398" font-size="10" fill="#7A8AA0" text-anchor="middle" font-style="italic">in-memory SQLite over the CSVs (SELECT-only)</text>
+
+  <!-- ============ OUTPUTS band (bottom) ============ -->
+  <text x="24" y="430" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">OUTPUTS</text>
+  <g>
+    <rect x="24" y="438" width="222" height="58" rx="9" fill="#1B2A3A"/><text x="135" y="463" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">Five-block decision</text><text x="135" y="481" font-size="10" fill="#AEC2D6" text-anchor="middle">traceable · every claim cited</text>
+    <rect x="258" y="438" width="222" height="58" rx="9" fill="#1B2A3A"/><text x="369" y="463" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">Real-time alerts</text><text x="369" y="481" font-size="10" fill="#AEC2D6" text-anchor="middle">auto-dispatch at CRITICAL</text>
+    <rect x="492" y="438" width="222" height="58" rx="9" fill="#1B2A3A"/><text x="603" y="463" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">Pre-shift report</text><text x="603" y="481" font-size="10" fill="#AEC2D6" text-anchor="middle">autonomous · work orders drafted</text>
+    <rect x="726" y="438" width="210" height="58" rx="9" fill="#0E7C70"/><text x="831" y="463" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">Digital logbook</text><text x="831" y="481" font-size="10" fill="#BFEAE3" text-anchor="middle">closure + feedback loop</text>
+  </g>
+
+  <!-- ============ ARROWS ============ -->
+  <!-- inputs -> brain -->
+  <line x1="174" y1="133" x2="194" y2="150" stroke="#5B7085" stroke-width="1.6" marker-end="url(#ah)"/>
+  <!-- engineer <-> brain (multi-turn, double) -->
+  <line x1="174" y1="287" x2="196" y2="240" stroke="#2B6CB0" stroke-width="1.8" marker-end="url(#ahb)" marker-start="url(#ahs)"/>
+  <text x="150" y="214" font-size="9.5" fill="#2B6CB0" transform="rotate(-40 150 214)">multi-turn</text>
+
+  <!-- brain <-> systems of record (double) -->
+  <line x1="616" y1="180" x2="640" y2="180" stroke="#2B6CB0" stroke-width="1.8" marker-end="url(#ahb)" marker-start="url(#ahs)"/>
+  <text x="628" y="172" font-size="9" fill="#2B6CB0" text-anchor="middle">tools</text>
+
+  <!-- brain <-> engines (double, vertical) -->
+  <line x1="298" y1="272" x2="298" y2="304" stroke="#5B7085" stroke-width="1.6" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+  <line x1="514" y1="272" x2="514" y2="304" stroke="#5B7085" stroke-width="1.6" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+
+  <!-- engines/brain -> outputs (decision) -->
+  <line x1="135" y1="324" x2="135" y2="436" stroke="#5B7085" stroke-width="1.4" marker-end="url(#ah)" stroke-dasharray="1 0"/>
+  <text x="140" y="416" font-size="9.5" fill="#5B7085">decision</text>
+
+  <!-- feedback loop: logbook -> RAG (dashed teal) -->
+  <path d="M831,438 C831,412 560,420 514,400" fill="none" stroke="#0E9488" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#ahf)"/>
+  <text x="690" y="420" font-size="9.5" fill="#0E9488" text-anchor="middle">feedback re-indexed → RAG</text>
+
+  <!-- ============ FOOTER: fallback ladder ============ -->
+  <text x="24" y="520" font-size="10.5" fill="#5B7085"><tspan font-weight="700" fill="#16202E">Zero-dependency fallback ladder:</tspan> runs on numpy + pandas + streamlit alone; auto-upgrades to scikit-learn + SHAP + ChromaDB + Claude when installed.</text>
+  <text x="24" y="535" font-size="9" fill="#94A3B8">* cascade_tool = designed (plant bottleneck / blast-radius), spec approved.</text>
+</svg>

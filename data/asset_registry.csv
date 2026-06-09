@@ -1,0 +1,13 @@
+asset_id,name,type,line,criticality,install_date,manufacturer
+FURNACE-01,Electric Arc Furnace 1,furnace,Melt Shop,5,2016-04-01,Siemens VAI
+LADLE-02,Ladle Refining Furnace 2,furnace,Melt Shop,5,2018-01-31,Danieli
+CONV-BELT-03,Sinter Conveyor Belt 3,conveyor,Sinter,4,2017-07-03,Danieli
+CONV-BELT-08,Charge Conveyor Belt 8,conveyor,Melt Shop,3,2016-02-24,Flowserve
+PUMP-12,Cooling Water Pump 12,pump,Utilities,4,2021-02-11,Siemens VAI
+PUMP-19,Hydraulic Supply Pump 19,pump,Caster,3,2021-08-15,Primetals
+HYD-VALVE-07,Mold Hydraulic Valve 7,valve,Caster,4,2015-05-11,Siemens VAI
+ROLL-MILL-04,Hot Strip Roll Mill 4,mill,Rolling,5,2016-01-19,Danieli
+ROLL-MILL-11,Cold Roll Stand 11,mill,Rolling,4,2017-08-10,ABB
+GEARBOX-05,Mill Drive Gearbox 5,gearbox,Rolling,4,2021-10-01,Siemens VAI
+COMPRESSOR-09,Plant Air Compressor 9,compressor,Utilities,3,2021-04-17,Danieli
+CRANE-06,Charge Bay EOT Crane 6,crane,Melt Shop,3,2021-02-10,Primetals
