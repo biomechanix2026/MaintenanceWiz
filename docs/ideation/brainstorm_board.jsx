@@ -1,3 +1,19 @@
+/*
+ * ============================================================================
+ *  EARLY IDEATION — NOT the implemented architecture.
+ * ============================================================================
+ *  This brainstorming board predates implementation and describes options that
+ *  were NOT built. In particular it mentions:
+ *    - "Orchestration: LangGraph"  -> the system uses NO LangGraph; it is a
+ *                                     plain Anthropic tool-use loop
+ *                                     (see agent/orchestrator.py) plus a
+ *                                     deterministic Python fallback.
+ *    - "LLM: Claude 3.5 Sonnet"    -> the implemented model id is
+ *                                     claude-sonnet-4-6.
+ *  Kept for provenance only. For the real architecture see README.md and
+ *  docs/deck/architecture.svg. Do not treat anything here as built behaviour.
+ * ============================================================================
+ */
 import { useState } from "react";
 
 const sections = [

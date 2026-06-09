@@ -204,8 +204,8 @@ function numCircle(s, x, y, n, d = 0.42, fill = C.BLUE) {
   });
   card(s, 0.5, 4.35, 9, 0.78, C.BLUELT, C.BLUE);
   s.addText([
-    { text: "STEP 4.5 — Plant impact (designed): ", options: { bold: true, color: C.BLUE } },
-    { text: "cascade_tool computes downstream blast radius so an asset's priority reflects what it idles, not just its own health.", options: { color: C.INK } },
+    { text: "STEP 4.5 — Plant impact  [ROADMAP — not in the prototype]: ", options: { bold: true, color: C.BLUE } },
+    { text: "a designed cascade_tool would compute downstream blast radius so an asset's priority reflects what it idles, not just its own health.", options: { color: C.INK } },
   ], { x: 0.7, y: 4.46, w: 8.6, h: 0.55, fontFace: F.B, fontSize: 12, valign: "middle", margin: 0 });
 })();
 

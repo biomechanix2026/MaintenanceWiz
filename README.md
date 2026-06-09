@@ -144,7 +144,7 @@ knowledge/
   rag.py                  asset-filtered RAG (ChromaDB or TF-IDF)
 agent/
   system_prompt.py        the Consolidated-Brain system prompt
-  tools.py                the 9-tool suite (structured outputs)
+  tools.py                the 10-tool suite (structured outputs)
   orchestrator.py         think→act→observe loop (LLM + deterministic)
 app/streamlit_app.py      5-panel dashboard
 scripts/pre_shift_run.py  autonomous pre-shift briefing (cron-friendly)
