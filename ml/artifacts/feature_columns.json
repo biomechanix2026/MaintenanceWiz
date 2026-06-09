@@ -6,6 +6,6 @@
     "humidity",
     "power"
   ],
-  "kind": "numpy-forest",
+  "kind": "sklearn-rf",
   "max_rul_days": 120
 }
