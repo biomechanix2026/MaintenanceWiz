@@ -36,5 +36,29 @@ def test_P3_bm25_ranking_and_filter():
         assert isinstance(h["score"], float), "score should be float"
 
 
+@suite.case
+def test_P3_hybrid_rrf_fusion():
+    from knowledge.rag import BM25Index, TfidfIndex, HybridIndex
+    hy = HybridIndex(TfidfIndex(_CHUNKS), BM25Index(_CHUNKS), "tfidf")
+    assert hy.kind == "hybrid(tfidf+bm25)", hy.kind
+    hits = hy.query("pinion vibration root cause", k=3)
+    assert hits and hits[0]["source"].startswith("INC-1"), hits
+    scores = [h["score"] for h in hits]
+    assert scores == sorted(scores, reverse=True), "not sorted by fused score"
+    only_a1 = hy.query("lubrication", asset_id="A1", k=4)
+    assert only_a1 and all(h["asset_id"] == "A1" for h in only_a1), "asset filter broken in fusion"
+
+
+@suite.case
+def test_P3_live_index_is_hybrid():
+    from knowledge.rag import load_index
+    rag = load_index()
+    assert rag.kind.startswith("hybrid("), f"live index not hybrid: {rag.kind}"
+    hits = rag.query("isolation repair procedure", asset_id="GEARBOX-05", k=4)
+    assert hits and all(h["asset_id"] == "GEARBOX-05" for h in hits)
+    for h in hits:
+        assert {"asset_id", "source", "type", "text", "score"} <= set(h)
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

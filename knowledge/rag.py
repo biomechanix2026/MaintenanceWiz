@@ -181,6 +181,30 @@ class BM25Index:
                  "score": round(float(s), 4)} for s, c in scored[:k]]
 
 
+class HybridIndex:
+    """Primary (dense Chroma or lexical TF-IDF) + BM25, fused with
+    reciprocal-rank fusion: score = sum over rankers of 1/(RRF_K + rank)."""
+    RRF_K = 60
+
+    def __init__(self, primary, bm25, primary_kind):
+        self.primary, self.bm25 = primary, bm25
+        self.kind = f"hybrid({primary_kind}+bm25)"
+
+    def query(self, text, asset_id=None, k=4):
+        pool = max(k * 3, 12)
+        fused: dict = {}
+        for results in (self.primary.query(text, asset_id=asset_id, k=pool),
+                        self.bm25.query(text, asset_id=asset_id, k=pool)):
+            for rank, hit in enumerate(results):
+                key = (hit["source"], hit["text"][:80])
+                entry = fused.setdefault(key, {**hit, "score": 0.0})
+                entry["score"] += 1.0 / (self.RRF_K + rank + 1)
+        out = sorted(fused.values(), key=lambda h: -h["score"])[:k]
+        for h in out:
+            h["score"] = round(h["score"], 4)
+        return out
+
+
 # --------------------------------------------------------------------------
 # Unified RAG facade
 # --------------------------------------------------------------------------
@@ -233,14 +257,17 @@ def build_index(prefer_chroma=True) -> RAG:
     chunks = build_chunks()
     if prefer_chroma:
         try:
-            return RAG(_build_chroma(chunks), "chromadb")
+            backend = _build_chroma(chunks)
+            hy = HybridIndex(backend, BM25Index(chunks), "chromadb")
+            return RAG(hy, hy.kind)
         except Exception as e:
             print(f"[info] ChromaDB unavailable ({type(e).__name__}); using TF-IDF fallback.")
     idx = TfidfIndex(chunks)
     os.makedirs(VECTORSTORE_DIR, exist_ok=True)
     with open(_TFIDF_PATH, "wb") as f:
         pickle.dump(idx, f)
-    return RAG(idx, "tfidf")
+    hy = HybridIndex(idx, BM25Index(chunks), "tfidf")
+    return RAG(hy, hy.kind)
 
 
 def load_index() -> RAG:
@@ -249,18 +276,21 @@ def load_index() -> RAG:
     Loading is non-destructive: an existing Chroma collection is wrapped and
     reused as-is (no delete/rebuild). Building happens only when nothing exists.
     """
+    chunks = build_chunks()
     try:
         import chromadb
         client = chromadb.PersistentClient(path=VECTORSTORE_DIR)
         col = client.get_collection("maintenance")
         if col.count() > 0:
-            return RAG(_ChromaBackend(col), "chromadb")
+            hy = HybridIndex(_ChromaBackend(col), BM25Index(chunks), "chromadb")
+            return RAG(hy, hy.kind)
     except Exception:
         pass
     if os.path.exists(_TFIDF_PATH):
         try:
             with open(_TFIDF_PATH, "rb") as f:
-                return RAG(pickle.load(f), "tfidf")
+                hy = HybridIndex(pickle.load(f), BM25Index(chunks), "tfidf")
+                return RAG(hy, hy.kind)
         except Exception:
             pass  # stale/incompatible pickle -> rebuild below
     return build_index(prefer_chroma=False)
