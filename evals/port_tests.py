@@ -114,5 +114,31 @@ def test_P2_fault_classifier_train_and_classify():
     assert res["probable_mode"] == "OSF", f"high torque*wear should be OSF, got {res}"
 
 
+@suite.case
+def test_P2_fault_tool_contract_and_degradation():
+    import config as C
+    from agent import tools as T
+    reading = dict(air_temperature_K=300.0, process_temperature_K=310.0,
+                   rotational_speed_rpm=1500.0, torque_Nm=60.0, tool_wear_min=240.0)
+    saved = C.ML_ARTIFACTS_DIR
+    try:
+        C.ML_ARTIFACTS_DIR = os.path.join(saved, "_nonexistent_")
+        out = T.fault_mode_tool(**reading)
+        assert out["available"] is False and "error" in out, out
+    finally:
+        C.ML_ARTIFACTS_DIR = saved
+    out = T.fault_mode_tool(**reading)
+    if not out.get("available", True):
+        gap("fault_model.pkl not trained on this machine - run: python -m ml.fault")
+    assert 0.0 <= out["risk"] <= 1.0 and out["probable_mode"], out
+
+
+@suite.case
+def test_P2_fault_tool_in_both_registries():
+    from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
+    assert "fault_mode_tool" in TOOL_FUNCS, "missing from TOOL_FUNCS"
+    assert any(s["name"] == "fault_mode_tool" for s in TOOL_SCHEMAS), "missing from TOOL_SCHEMAS"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

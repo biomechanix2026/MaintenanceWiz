@@ -147,6 +147,35 @@ def prognostic_tool(asset_id: str) -> dict:
     }
 
 
+def fault_mode_tool(air_temperature_K: float, process_temperature_K: float,
+                    rotational_speed_rpm: float, torque_Nm: float,
+                    tool_wear_min: float, machine_type: str = "M") -> dict:
+    """Classify AI4I-style failure risk and probable failure mode.
+
+    This is an on-demand evidence tool. It degrades gracefully when the optional
+    trained artifact or sklearn-backed model cannot be loaded.
+    """
+    path = os.path.join(C.ML_ARTIFACTS_DIR, "fault_model.pkl")
+    if not os.path.exists(path):
+        return {"available": False,
+                "error": "fault classifier not trained - run: python -m ml.fault"}
+    try:
+        from ml.fault import load_fault_model, classify_fault
+        bundle = load_fault_model(path)
+        res = classify_fault(bundle, {
+            "Type": machine_type,
+            "Air temperature [K]": air_temperature_K,
+            "Process temperature [K]": process_temperature_K,
+            "Rotational speed [rpm]": rotational_speed_rpm,
+            "Torque [Nm]": torque_Nm,
+            "Tool wear [min]": tool_wear_min,
+        })
+        return {"available": True, **res,
+                "basis": "AI4I 2020 (UCI 601) analogue; TWF/RNF near-random in source data"}
+    except Exception as e:
+        return {"available": False, "error": f"{type(e).__name__}: {e}"}
+
+
 # ==========================================================================
 # TOOL 2: Independent abnormality detection (dynamic early warning)
 # ==========================================================================

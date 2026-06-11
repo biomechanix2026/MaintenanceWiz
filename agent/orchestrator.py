@@ -30,6 +30,9 @@ from config import ALERT_THRESHOLD
 TOOL_FUNCS = {
     "resolve_asset": lambda a: T.resolve_asset(a["query"]),
     "prognostic_tool": lambda a: T.prognostic_tool(a["asset_id"]),
+    "fault_mode_tool": lambda a: T.fault_mode_tool(
+        a["air_temperature_K"], a["process_temperature_K"], a["rotational_speed_rpm"],
+        a["torque_Nm"], a["tool_wear_min"], a.get("machine_type", "M")),
     "abnormality_tool": lambda a: T.abnormality_tool(a["asset_id"]),
     "rag_tool": lambda a: T.rag_tool(a["query"], a.get("asset_id"), a.get("k", 4)),
     "inventory_tool": lambda a: T.inventory_tool(a["asset_id"]),
@@ -51,6 +54,17 @@ TOOL_SCHEMAS = [
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
     {"name": "prognostic_tool", "description": "RUL, failure probability and SHAP attribution for an asset.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
+    {"name": "fault_mode_tool",
+     "description": "Classify failure risk and probable failure mode (TWF/HDF/PWF/OSF/RNF) from machine operating parameters. Call when the engineer provides operating readings to assess.",
+     "input_schema": {"type": "object", "properties": {
+         "air_temperature_K": {"type": "number"},
+         "process_temperature_K": {"type": "number"},
+         "rotational_speed_rpm": {"type": "number"},
+         "torque_Nm": {"type": "number"},
+         "tool_wear_min": {"type": "number"},
+         "machine_type": {"type": "string", "enum": ["L", "M", "H"]}},
+      "required": ["air_temperature_K", "process_temperature_K", "rotational_speed_rpm",
+                   "torque_Nm", "tool_wear_min"]}},
     {"name": "abnormality_tool", "description": "Independent dynamic abnormality detection from sensor deviations and trend.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
     {"name": "rag_tool", "description": "Retrieve SOP/manual/incident text, optionally filtered to an asset_id.",
