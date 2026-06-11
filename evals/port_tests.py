@@ -60,5 +60,20 @@ def test_P3_live_index_is_hybrid():
         assert {"asset_id", "source", "type", "text", "score"} <= set(h)
 
 
+@suite.case
+def test_P4_citation_doc_blocks():
+    from agent.orchestrator import _doc_blocks_from_rag
+    blocks = _doc_blocks_from_rag([
+        {"asset_id": "GEARBOX-05", "source": "Manual GEARBOX-05 - Isolation",
+         "type": "manual", "text": "1. Lock out drive. 2. Vent hydraulics.", "score": 0.9},
+    ])
+    assert len(blocks) == 1
+    b = blocks[0]
+    assert b["type"] == "document" and b["citations"] == {"enabled": True}
+    assert b["source"]["data"].startswith("1. Lock out drive")
+    assert b["title"] == "Manual GEARBOX-05 - Isolation"
+    assert "GEARBOX-05" in b["context"]
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

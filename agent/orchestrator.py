@@ -79,6 +79,7 @@ class AgentResult:
     mode: str = "deterministic"
     trace: list = field(default_factory=list)       # [{tool, input, output}] - observability
     structured: dict = field(default_factory=dict)  # machine-readable result for logbook/evals
+    citations: list = field(default_factory=list)   # Anthropic citation metadata, LLM mode only
 
 
 # Live-alert toggle. A plain diagnostic query is side-effect-free: alert
@@ -91,6 +92,27 @@ def _dispatch(name, args, trace):
     out = TOOL_FUNCS[name](args)
     trace.append({"tool": name, "input": args, "output": out})
     return out
+
+
+def _doc_blocks_from_rag(results: list[dict]) -> list[dict]:
+    """Convert RAG hits into Anthropic document blocks with citations enabled."""
+    blocks = []
+    for hit in results:
+        blocks.append({
+            "type": "document",
+            "source": {
+                "type": "text",
+                "media_type": "text/plain",
+                "data": hit["text"],
+            },
+            "title": str(hit.get("source", "doc"))[:255],
+            "context": json.dumps({
+                "asset_id": hit.get("asset_id"),
+                "type": hit.get("type"),
+            }),
+            "citations": {"enabled": True},
+        })
+    return blocks
 
 
 # ==========================================================================
@@ -303,25 +325,39 @@ def run_llm(query: str, history: list | None = None,
 
     for _ in range(max_steps):
         resp = client.messages.create(
-            model=model, max_tokens=2000, system=SYSTEM_PROMPT,
+            model=model, max_tokens=2000,
+            system=[{"type": "text", "text": SYSTEM_PROMPT,
+                     "cache_control": {"type": "ephemeral"}}],
             tools=TOOL_SCHEMAS, messages=messages,
         )
         if resp.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": resp.content})
-            results = []
+            results, doc_blocks = [], []
             for block in resp.content:
                 if block.type == "tool_use":
                     out = _dispatch(block.name, block.input, trace)
                     results.append({"type": "tool_result", "tool_use_id": block.id,
                                     "content": json.dumps(out, default=str)})
-            messages.append({"role": "user", "content": results})
+                    if block.name == "rag_tool":
+                        doc_blocks.extend(_doc_blocks_from_rag(out.get("results", [])))
+            messages.append({"role": "user", "content": results + doc_blocks})
         else:
             text = "".join(b.text for b in resp.content if b.type == "text")
+            citations = []
+            for b in resp.content:
+                if getattr(b, "type", None) == "text":
+                    for c in getattr(b, "citations", None) or []:
+                        citations.append({
+                            "cited_text": c.cited_text,
+                            "document_title": c.document_title,
+                            "document_index": c.document_index,
+                        })
             aid = next((t["output"].get("asset_id") for t in trace
                         if t["tool"] == "resolve_asset" and t["output"].get("asset_id")),
                        focus_asset)
             return AgentResult(answer_markdown=text, asset_id=aid, mode="llm",
-                               trace=trace, structured=_structured_from_trace(trace, aid))
+                               trace=trace, structured=_structured_from_trace(trace, aid),
+                               citations=citations)
     return AgentResult(answer_markdown="(reached step limit)", mode="llm", trace=trace,
                        structured=_structured_from_trace(trace, focus_asset))
 
