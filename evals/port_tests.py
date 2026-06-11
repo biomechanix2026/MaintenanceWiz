@@ -75,5 +75,44 @@ def test_P4_citation_doc_blocks():
     assert "GEARBOX-05" in b["context"]
 
 
+def _ai4i_fixture():
+    import numpy as np
+    import pandas as pd
+    rng = np.random.default_rng(0)
+    n = 200
+    torque = rng.normal(40, 10, n)
+    wear = rng.uniform(0, 250, n)
+    osf = ((torque * wear) > 11000).astype(int)
+    df = pd.DataFrame({
+        "Type": rng.choice(["L", "M", "H"], n),
+        "Air temperature [K]": rng.normal(300, 2, n),
+        "Process temperature [K]": rng.normal(310, 1, n),
+        "Rotational speed [rpm]": rng.normal(1500, 100, n),
+        "Torque [Nm]": torque,
+        "Tool wear [min]": wear,
+        "TWF": 0, "HDF": 0, "PWF": 0, "RNF": 0,
+        "OSF": osf,
+    })
+    df["Machine failure"] = df[["TWF", "HDF", "PWF", "OSF", "RNF"]].max(axis=1)
+    return df
+
+
+@suite.case
+def test_P2_fault_classifier_train_and_classify():
+    try:
+        import sklearn  # noqa: F401
+    except ImportError:
+        gap("sklearn not installed - fault classifier rung unavailable here")
+    from ml.fault import train_fault_model, classify_fault, MODES
+    bundle = train_fault_model(_ai4i_fixture())
+    res = classify_fault(bundle, {
+        "Type": "M", "Air temperature [K]": 300.0, "Process temperature [K]": 310.0,
+        "Rotational speed [rpm]": 1500.0, "Torque [Nm]": 60.0, "Tool wear [min]": 240.0,
+    })
+    assert 0.0 <= res["risk"] <= 1.0, res
+    assert set(res["probs"]) == set(MODES), res
+    assert res["probable_mode"] == "OSF", f"high torque*wear should be OSF, got {res}"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))
