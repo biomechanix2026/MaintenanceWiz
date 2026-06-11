@@ -143,6 +143,44 @@ class TfidfIndex:
         return out
 
 
+class BM25Index:
+    """Okapi BM25 over the chunk corpus. Pure stdlib (math + Counter) so it
+    is always available, regardless of which dense backend is live."""
+    K1, B = 1.5, 0.75
+
+    def __init__(self, chunks):
+        self.chunks = chunks
+        self.docs = [_tok(c["text"] + " " + c["source"]) for c in chunks]
+        self.doc_len = [len(d) or 1 for d in self.docs]
+        self.avg_len = (sum(self.doc_len) / len(self.docs)) if self.docs else 1.0
+        df = Counter()
+        for d in self.docs:
+            df.update(set(d))
+        n = len(self.docs)
+        self.idf = {t: math.log(1 + (n - c + 0.5) / (c + 0.5)) for t, c in df.items()}
+        self.tf = [Counter(d) for d in self.docs]
+
+    def query(self, text, asset_id=None, k=4):
+        q = _tok(text)
+        scored = []
+        for i, c in enumerate(self.chunks):
+            if asset_id and c["asset_id"] != asset_id:
+                continue
+            dl = self.doc_len[i]
+            s = 0.0
+            for t in q:
+                f = self.tf[i].get(t)
+                if not f:
+                    continue
+                s += (self.idf.get(t, 0.0) * f * (self.K1 + 1)
+                      / (f + self.K1 * (1 - self.B + self.B * dl / self.avg_len)))
+            if s > 0:
+                scored.append((s, c))
+        scored.sort(key=lambda x: -x[0])
+        return [{**{kk: c[kk] for kk in ("asset_id", "source", "type", "text")},
+                 "score": round(float(s), 4)} for s, c in scored[:k]]
+
+
 # --------------------------------------------------------------------------
 # Unified RAG facade
 # --------------------------------------------------------------------------
