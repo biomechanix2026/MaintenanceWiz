@@ -366,6 +366,10 @@ if view == UI.VIEWS[1]:
     rag = rag_tool("isolation repair procedure", asset_id=aid, k=4)
     hits = rag.get("results", [])
     incident_hits = [h for h in hits if str(h.get("type", "")).lower() == "incident"]
+    try:
+        prior_incidents = not pd.read_csv(C.INCIDENTS_CSV).query("asset_id == @aid").empty
+    except Exception:
+        prior_incidents = bool(incident_hits)
     for hit in hits:
         hit_type = str(hit.get("type", "")).lower()
         icon = "📘" if hit_type == "manual" else "⚠️" if hit_type == "incident" else "📄"
@@ -374,8 +378,10 @@ if view == UI.VIEWS[1]:
             st.markdown(hit.get("text", ""))
             if "score" in hit:
                 st.caption(f"Retrieval score: {hit['score']}")
-    if not incident_hits:
+    if not incident_hits and not prior_incidents:
         st.info("No prior incidents on record")
+    elif not incident_hits:
+        st.info("No incident evidence returned for this query")
 
     st.markdown('<div class="mw-cta">', unsafe_allow_html=True)
     if st.button("💬 Ask the Wizard about this asset", key=f"ask_wizard_{aid}", use_container_width=True):
@@ -394,6 +400,8 @@ if view == UI.VIEWS[2]:
         st.session_state.chat = []
 
     q = st.chat_input("Describe the asset, alert, or symptom...")
+    q = q or st.session_state.pop("chat_prefill", None)
+
     for turn in st.session_state.chat:
         with st.chat_message(turn["role"]):
             st.markdown(turn["content"], unsafe_allow_html=True)
