@@ -98,9 +98,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
    12 assets with the same deterministic tools the chat uses and writes the
    shift briefing to `reports/`. This morning: **5 assets need
    attention** (1 critical).
-2. **Alerts are already routed** — CRITICAL findings went to
-   `shift-supervisor@plant.local` per the config role map; HIGH to reliability engineering.
-   Re-running the scan does not re-spam: same asset+band+day is not logged twice.
+2. **Alerts are already routed** — all five of this morning's findings crossed the critical threshold, so every alert went to `shift-supervisor@plant.local`. Routing follows the config role map (critical → supervisor, high → reliability, else maintenance). Re-running the scan does not re-spam: same asset+band+day is not logged twice.
 3. **Meera reads the briefing** — counts by band, urgent assets in score
    order, and a drafted work order for each — including long-lead parts to
    order now.
