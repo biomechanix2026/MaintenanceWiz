@@ -1,0 +1,43 @@
+<svg viewBox="0 0 1200 240" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">
+  <text x="16" y="28" font-size="18" font-weight="bold" fill="#1F2937">The cast — four roles, one consolidated brain</text>
+  <g>
+    <rect x="16" y="48" width="280" height="170" rx="10" fill="#F8FAFC" stroke="#94A3B8"/>
+    <circle cx="52" cy="88" r="20" fill="#2563EB"/><text x="52" y="94" font-size="16" fill="#fff" text-anchor="middle">A</text>
+    <text x="84" y="84" font-size="15" font-weight="bold" fill="#1F2937">Arjun</text>
+    <text x="84" y="102" font-size="12" fill="#475569">Field technician</text>
+    <text x="32" y="136" font-size="12" fill="#1F2937">Gloved, interrupted, on the floor.</text>
+    <text x="32" y="156" font-size="12" fill="#1F2937">Needs: what to fix, in what order,</text>
+    <text x="32" y="172" font-size="12" fill="#1F2937">with which steps and parts.</text>
+    <text x="32" y="200" font-size="11" fill="#2563EB">Chat · Deep-Dive · Logbook</text>
+  </g>
+  <g>
+    <rect x="316" y="48" width="280" height="170" rx="10" fill="#F8FAFC" stroke="#94A3B8"/>
+    <circle cx="352" cy="88" r="20" fill="#0EA5E9"/><text x="352" y="94" font-size="16" fill="#fff" text-anchor="middle">M</text>
+    <text x="384" y="84" font-size="15" font-weight="bold" fill="#1F2937">Meera</text>
+    <text x="384" y="102" font-size="12" fill="#475569">Shift supervisor</text>
+    <text x="332" y="136" font-size="12" fill="#1F2937">Control room, shift handover.</text>
+    <text x="332" y="156" font-size="12" fill="#1F2937">Needs: plant-wide risk before</text>
+    <text x="332" y="172" font-size="12" fill="#1F2937">anyone logs in.</text>
+    <text x="332" y="200" font-size="11" fill="#2563EB">Pre-Shift · Wallboard · Alerts</text>
+  </g>
+  <g>
+    <rect x="616" y="48" width="280" height="170" rx="10" fill="#F8FAFC" stroke="#94A3B8"/>
+    <circle cx="652" cy="88" r="20" fill="#10B981"/><text x="652" y="94" font-size="16" fill="#fff" text-anchor="middle">D</text>
+    <text x="684" y="84" font-size="15" font-weight="bold" fill="#1F2937">Dev</text>
+    <text x="684" y="102" font-size="12" fill="#475569">Reliability engineer</text>
+    <text x="632" y="136" font-size="12" fill="#1F2937">Desk + floor walks.</text>
+    <text x="632" y="156" font-size="12" fill="#1F2937">Needs: why the score is what it is —</text>
+    <text x="632" y="172" font-size="12" fill="#1F2937">and a way to correct the system.</text>
+    <text x="632" y="200" font-size="11" fill="#2563EB">Deep-Dive · Feedback loop</text>
+  </g>
+  <g>
+    <rect x="916" y="48" width="280" height="170" rx="10" fill="#F8FAFC" stroke="#94A3B8"/>
+    <circle cx="952" cy="88" r="20" fill="#F59E0B"/><text x="952" y="94" font-size="16" fill="#fff" text-anchor="middle">S</text>
+    <text x="984" y="84" font-size="15" font-weight="bold" fill="#1F2937">Shalini</text>
+    <text x="984" y="102" font-size="12" fill="#475569">Maintenance manager</text>
+    <text x="932" y="136" font-size="12" fill="#1F2937">Standups, IW38, daily management.</text>
+    <text x="932" y="156" font-size="12" fill="#1F2937">Needs: where tomorrow's downtime</text>
+    <text x="932" y="172" font-size="12" fill="#1F2937">comes from — with evidence.</text>
+    <text x="932" y="200" font-size="11" fill="#2563EB">Bottleneck board · Evidence room</text>
+  </g>
+</svg>

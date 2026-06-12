@@ -11,6 +11,9 @@ it is a **System of Action** that reasons about what is about to break, prepares
 the work order before the engineer logs in, and refuses to close a job until
 every compliance step is logged.
 
+> 🧭 **Start here for the demo:** [User journeys & demo script](docs/UX_JOURNEYS.md) —
+> how four plant roles use the Wizard, with timed, click-by-click walkthroughs.
+
 ---
 
 ## The idea in one line
