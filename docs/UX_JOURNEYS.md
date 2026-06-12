@@ -289,7 +289,7 @@ Demonstrates PDF objectives: 5.2 (risk bands, plant bottleneck), 6.4
   data contracts around it.
 - **Writes stay gated:** conversational logging routes intent to a reviewable
   write path, not free-form mutation.
-- **The roadmap has names:** every gap maps to an existing research section or a
+- **The future work has names:** every gap maps to an existing research section or a
   proposed `NEW-*` feature.
 
 Demo: 30-second storyboard walkthrough of the frames below.
@@ -378,4 +378,12 @@ The F-journeys surface five features the research doesn't yet contain:
 
 # Deck hooks
 
-<!-- filled by Task 8 -->
+Slide candidates, in pitch order (slide edits in `docs/deck/build_deck.js` are
+a separate task):
+
+1. **The flip** — `t1_map.svg` + `t1_fiveblock_constraint.png` (constraint-aware
+   reasoning is the signature moment).
+2. **Before anyone logs in** — T2's cold open + `t2_wallboard.png` (Systems of
+   Action).
+3. **Same brain, wider intake** — `today_vs_tobe.svg` (the vision slide).
+4. **The cast** — `cast.svg` (who it's for).
