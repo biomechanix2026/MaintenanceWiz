@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maintenance Wizard — Agentic Maintenance Copilot</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --line:#2d333b; --text:#e6edf3;
+          --dim:#8b949e; --accent:#e8590c; --user:#1f3a5f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.5 system-ui, "Segoe UI", sans-serif;
+         display:flex; flex-direction:column; height:100vh; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line);
+           display:flex; align-items:baseline; gap:12px; }
+  header h1 { font-size:17px; margin:0; }
+  header span { color:var(--dim); font-size:13px; }
+  #log { flex:1; overflow-y:auto; padding:20px; max-width:860px;
+         width:100%; margin:0 auto; }
+  .msg { padding:10px 14px; border-radius:10px; margin:8px 0;
+         word-wrap:break-word; }
+  .user { background:var(--user); margin-left:15%; white-space:pre-wrap; }
+  .bot  { background:var(--panel); border:1px solid var(--line);
+          margin-right:5%; }
+  .bot h3 { font-size:14px; color:var(--accent); margin:12px 0 4px; }
+  .bot code { background:#0e1116; padding:1px 5px; border-radius:4px;
+              font-size:13px; }
+  .bot blockquote { border-left:3px solid var(--accent); margin:6px 0;
+                    padding-left:10px; color:var(--dim); }
+  .cites { font-size:12.5px; color:var(--dim); border-top:1px dashed
+           var(--line); margin-top:8px; padding-top:6px; }
+  .cites b { color:var(--accent); }
+  .err { color:#f85149; }
+  #examples { max-width:860px; margin:0 auto; padding:0 20px 8px;
+              display:flex; flex-wrap:wrap; gap:8px; }
+  #examples button { background:var(--panel); color:var(--dim);
+      border:1px solid var(--line); border-radius:14px; padding:5px 12px;
+      cursor:pointer; font-size:13px; }
+  #examples button:hover { color:var(--text); border-color:var(--accent); }
+  form { display:flex; gap:8px; padding:14px 20px 18px; max-width:860px;
+         width:100%; margin:0 auto; }
+  input { flex:1; background:var(--panel); border:1px solid var(--line);
+          border-radius:8px; color:var(--text); padding:10px 12px;
+          font-size:15px; }
+  input:focus { outline:1px solid var(--accent); }
+  button[type=submit] { background:var(--accent); color:#fff; border:0;
+      border-radius:8px; padding:0 18px; font-size:15px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  footer { text-align:center; color:var(--dim); font-size:12px;
+           padding-bottom:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔧 Maintenance Wizard</h1>
+  <span>Agentic decision-support for a (synthetic) heavy steel plant</span>
+</header>
+<div id="log">
+  <div class="msg bot">Hello! I'm the Maintenance Wizard. Ask me about any
+plant asset — by ID (GEARBOX-05, FURNACE-01, HYD-VALVE-07…) or plain jargon
+("the EAF", "that leaking caster valve"). I diagnose with live prognostics,
+manuals/SOPs, delay history and spares data, and answer in a five-block
+maintenance decision with full traceability.</div>
+</div>
+<div id="examples">
+  <button>What's wrong with the mill gearbox?</button>
+  <button>That valve that keeps leaking on the caster</button>
+  <button>Status of the charge bay crane</button>
+  <button>Check the EAF</button>
+</div>
+<form id="f">
+  <input id="q" autocomplete="off"
+         placeholder="Ask about any asset — ID or jargon" />
+  <button type="submit" id="send">Send</button>
+</form>
+<footer>Synthetic data · decision support only · the agent may run several
+tool calls per answer (typically 10–30 s)</footer>
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("f");
+const input = document.getElementById("q");
+const send = document.getElementById("send");
+let history = [];
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",
+                                      '"':"&quot;","'":"&#39;"}[m]));
+}
+
+// Minimal renderer for the five-block markdown contract: escape first,
+// then headers / bold / inline code / blockquotes / line breaks only.
+function renderMd(text) {
+  return escapeHtml(text)
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\n/g, "<br>");
+}
+
+function add(cls, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  if (cls === "bot") d.innerHTML = renderMd(text);
+  else d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+function addSources(node, sources) {
+  if (!sources || !sources.length) return;
+  const seen = new Set();
+  const lines = [];
+  for (const s of sources) {
+    const key = s.source || "?";
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lines.push(key);
+  }
+  const div = document.createElement("div");
+  div.className = "cites";
+  div.innerHTML = "<b>Retrieved sources:</b> " +
+                  lines.map(escapeHtml).join(" · ");
+  node.appendChild(div);
+}
+
+async function ask(text) {
+  add("user", text);
+  input.value = "";
+  send.disabled = true;
+  const pending = add("bot", "Thinking and running tools…");
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({message: text, history}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    history = data.history;
+    pending.innerHTML = renderMd(data.text);
+    addSources(pending, data.sources);
+  } catch (err) {
+    pending.textContent = "Error: " + err.message;
+    pending.classList.add("err");
+  } finally {
+    send.disabled = false;
+    input.focus();
+  }
+}
+
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (text && !send.disabled) ask(text);
+});
+document.getElementById("examples").addEventListener("click", e => {
+  if (e.target.tagName === "BUTTON" && !send.disabled) ask(e.target.textContent);
+});
+</script>
+</body>
+</html>
