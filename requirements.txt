@@ -13,6 +13,7 @@ shap
 chromadb
 anthropic
 xgboost        # optional: stronger benchmark variant in ml/benchmark_rul.py
+google-genai   # hosted-demo build (web/): Gemini free-tier function calling
 
 # --- Optional viz niceties ---
 matplotlib

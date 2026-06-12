@@ -8,3 +8,6 @@ data/feedback.csv
 data/raw/
 .superpowers/
 docs/deck/slides/
+knowledge/store/
+dist/
+ml/artifacts/*.pkl
