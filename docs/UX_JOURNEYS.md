@@ -94,9 +94,13 @@ Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1 (diagno
 
 1. **The scan runs itself** — *cron, before dawn*: `pre_shift_run` scores all
    12 assets with the same deterministic tools the chat uses and writes the
-   shift briefing to `reports/`. This morning: **5 assets need
+   shift briefing to `reports/`. This morning: **9 assets need
    attention** (1 critical).
-2. **Alerts are already routed** — all five of this morning's findings carried **anomaly-critical** early warnings from the independent sensor detector, so every alert escalated to `shift-supervisor@plant.local`. Routing follows the config role map (critical → supervisor, high → reliability, else maintenance). Re-running the scan does not re-spam: same asset+band+day is not logged twice.
+2. **Alerts are already routed** — the critical overnight risk routes to
+   `shift-supervisor@plant.local`, via `config.py` `ALERT_ROLES` (critical →
+   supervisor, high → reliability, else maintenance). Re-running the scan does
+   not re-spam: the repeated alert is **already sent today — deduped** for the
+   same asset+band+day.
 3. **Meera reads the briefing** — counts by band, urgent assets in score
    order, and a drafted work order for each — including long-lead parts to
    order now.
@@ -114,28 +118,31 @@ Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1 (diagno
 
 ### What to notice (judges)
 
-- **Step 1:** the same consolidated brain runs *proactively* — "Systems of
-  Action": work product exists before the first human login.
-- **Step 2:** role routing comes from `config.py`, and dedup is per
-  asset+band+day — alarm fatigue is treated as a safety hazard, not a metric.
-- **Steps 1–5:** zero LLM calls — the deterministic pipeline produced all of
-  it. This demo runs identically with no API key and no network.
+- **Cron-friendly autonomy:** the same consolidated brain runs *proactively* —
+  "Systems of Action": work product exists before the first human login.
+- **Role routing:** alert destinations come from `config.py` `ALERT_ROLES`.
+  Critical risks route to the shift supervisor, high risks to reliability, and
+  everything else to maintenance.
+- **Dedup discipline:** per asset+band+day dedup prevents alarm fatigue while
+  preserving the original alert trail.
+- **Zero LLM cost:** the deterministic pipeline produced the briefing, routing,
+  and report. This demo runs identically with no API key and no network.
 
 ### Demo script (1:30)
 
 | Clock | Action | Expect on screen |
 |---|---|---|
 | 0:00 | Terminal: `python -m scripts.pre_shift_run` | Scan output, report path printed |
-| 0:20 | Open the newest `reports/preshift_*.md` | Counts: 5 need attention, 1 critical |
-| 0:45 | Point at the alert routing line | shift-supervisor@plant.local |
-| 1:00 | Re-run the same command | Dedup: no duplicate alerts |
-| 1:10 | Browser: `http://localhost:8501/?wallboard=1` (app must be running: `streamlit run app/streamlit_app.py`) | Top cards, wallboard mode |
+| 0:20 | Open the newest `reports/preshift_*.md` and read counts | Counts: 9 need attention, 1 critical |
+| 0:45 | Show the alert routing line | Critical → `shift-supervisor@plant.local` |
+| 1:00 | Re-run the same command and point at dedup | Already sent today — deduped |
+| 1:10 | Open `http://localhost:8501/?wallboard=1` | Top cards, wallboard mode |
 | 1:30 | End | — |
 
 ### Traceability
 
-Demonstrates PDF objectives: 5.4 (reports, alert reports, decision summaries),
-6.7 (real-time alerting), 7 (dashboard, role-based alerts).
+Demonstrates PDF objectives: 5.4 (alert reports, decision summaries),
+6.7 (real-time alerting), 7 (dashboard, role alerts).
 
 <!-- T3..T4 inserted by Tasks 4-5 -->
 
