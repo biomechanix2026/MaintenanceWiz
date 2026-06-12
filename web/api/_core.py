@@ -29,8 +29,16 @@ from google import genai
 from google.genai import types
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-MODEL = os.environ.get("WIZARD_MODEL", "gemini-2.5-flash")
-MAX_TOKENS = int(os.environ.get("WIZARD_MAX_TOKENS", "4000"))
+
+_BOM = chr(0xFEFF)  # platform env tooling (e.g. PowerShell pipes) prepends this
+
+
+def _env(name: str, default: str = "") -> str:
+    return (os.environ.get(name) or default).strip().lstrip(_BOM) or default
+
+
+MODEL = _env("WIZARD_MODEL", "gemini-2.5-flash")
+MAX_TOKENS = int(_env("WIZARD_MAX_TOKENS", "4000"))
 MAX_TOOL_ROUNDS = 10
 RATE_LIMIT = 20      # requests per IP ...
 RATE_WINDOW = 3600   # ... per hour (in-memory, per warm instance)
@@ -327,10 +335,8 @@ def _system_prompt() -> str:
 
 def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
     """One stateless turn. Returns (rendered, updated_history)."""
-    # Strip whitespace/BOM that platform env tooling can prepend - a dirty
-    # key ends up in an HTTP header and crashes ascii encoding.
-    api_key = (os.environ.get("GEMINI_API_KEY") or "").strip().lstrip("﻿")
-    client = genai.Client(api_key=api_key or None)
+    # A dirty key ends up in an HTTP header and crashes ascii encoding.
+    client = genai.Client(api_key=_env("GEMINI_API_KEY") or None)
     contents = [types.Content(**c) for c in history]
     contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
     config_ = types.GenerateContentConfig(
