@@ -1,5 +1,6 @@
 <svg viewBox="0 0 1200 240" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">
   <text x="16" y="28" font-size="18" font-weight="bold" fill="#1F2937">The cast — four roles, one consolidated brain</text>
+  <!-- card template: x = 16, 316, 616, 916 -->
   <g>
     <rect x="16" y="48" width="280" height="170" rx="10" fill="#F8FAFC" stroke="#94A3B8"/>
     <circle cx="52" cy="88" r="20" fill="#2563EB"/><text x="52" y="94" font-size="16" fill="#fff" text-anchor="middle">A</text>

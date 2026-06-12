@@ -6,7 +6,7 @@
 > that drive our feature planning; nothing in Part 2 is built.
 
 **How to read the tags:** plain step = runs today · 🔜 = approved tranche in
-flight ([the cascade/scenario/KPI plan](superpowers/plans/2026-06-12-cascade-scenario-kpi.md)) · ROADMAP =
+flight (`docs/superpowers/plans/2026-06-12-cascade-scenario-kpi.md`) · ROADMAP =
 Part 2 only, not built.
 
 ![The cast](journeys/cast.svg)
@@ -20,16 +20,16 @@ Part 2 only, not built.
 
 ---
 
-## Part 1 — Today (demo-grade)
+# Part 1 — Today (demo-grade)
 
-### T1 · Arjun, field technician — "The part that can't arrive in time"
+## T1 · Arjun, field technician — "The part that can't arrive in time"
 
 > *At shift start the mill drive gearbox is trending toward failure — and the
 > replacement pinion is 45 days away.*
 
 ![T1 journey map](journeys/t1_map.svg)
 
-#### The journey
+### The journey
 
 1. **Arjun types what he'd say to a colleague** — *Wizard Chat*: "what's wrong
    with the mill gearbox?" `resolve_asset` maps the jargon to **GEARBOX-05**.
@@ -56,7 +56,7 @@ Part 2 only, not built.
    disabled until the compliance checklist (parts recorded, steps logged,
    isolation cleared, follow-up scheduled, logbook entry) is green.
 
-#### What to notice (judges)
+### What to notice (judges)
 
 - **Step 2:** the five-block contract is identical in LLM and offline
   deterministic mode — run this demo with no API key.
@@ -66,7 +66,7 @@ Part 2 only, not built.
 - **Step 6:** chat never writes; closure goes through a gated form. Side
   effects are opt-in by design.
 
-#### Demo script (2:30)
+### Demo script (2:30)
 
 | Clock | Action | Expect on screen |
 |---|---|---|
@@ -79,20 +79,20 @@ Part 2 only, not built.
 | 1:45 | Logbook tab → tick checklist items one by one | Button enables only at 5/5 |
 | 2:15 | Close & log | Logbook entry appears |
 
-#### Traceability
+### Traceability
 
 Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1
 (diagnosis, root cause, RUL), 5.2 (constraint-based priority), 5.3 (step-by-step
 actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 
-### T2 · Meera, shift supervisor — "The shift that starts itself"
+## T2 · Meera, shift supervisor — "The shift that starts itself"
 
 > *It's 05:45. No one has logged in — but the plant has already been scanned,
 > scored, and the night's new risk routed to the right inboxes.*
 
 ![T2 journey map](journeys/t2_map.svg)
 
-#### The journey
+### The journey
 
 1. **The scan runs itself** — *cron, before dawn*: `pre_shift_run` scores all
    12 assets with the same deterministic tools the chat uses and writes the
@@ -114,7 +114,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 5. **Handover takes minutes, not war stories** — every claim in the meeting
    traces to the report file; yesterday-vs-today score deltas replace anecdotes.
 
-#### What to notice (judges)
+### What to notice (judges)
 
 - **Step 1:** the same consolidated brain runs *proactively* — "Systems of
   Action": work product exists before the first human login.
@@ -123,7 +123,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 - **Steps 1–5:** zero LLM calls — the deterministic pipeline produced all of
   it. This demo runs identically with no API key and no network.
 
-#### Demo script (1:30)
+### Demo script (1:30)
 
 | Clock | Action | Expect on screen |
 |---|---|---|
@@ -134,7 +134,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 | 1:10 | Browser: `http://localhost:8501/?wallboard=1` (app must be running: `streamlit run app/streamlit_app.py`) | Top cards, wallboard mode |
 | 1:30 | End | — |
 
-#### Traceability
+### Traceability
 
 Demonstrates PDF objectives: 5.4 (reports, alert reports, decision summaries),
 6.7 (real-time alerting), 7 (dashboard, role-based alerts).
@@ -143,16 +143,16 @@ Demonstrates PDF objectives: 5.4 (reports, alert reports, decision summaries),
 
 ---
 
-## Part 2 — To-be (ROADMAP)
+# Part 2 — To-be (ROADMAP)
 
 <!-- F1..F2 inserted by Task 6 -->
 
 ---
 
-## Additions proposed for FEATURE_RESEARCH.md
+# Additions proposed for FEATURE_RESEARCH.md
 
 <!-- filled by Task 6 -->
 
-## Deck hooks
+# Deck hooks
 
 <!-- filled by Task 8 -->
