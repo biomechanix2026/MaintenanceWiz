@@ -137,7 +137,15 @@ def prognostic_tool(asset_id: str) -> dict:
     rul = m.predict_rul(atype, readings)
     prob = m.failure_probability(atype, readings)
     explain = m.explain(atype, readings)
-    return {
+    benchmark = None
+    bench_path = os.path.join(C.ML_ARTIFACTS_DIR, "benchmark.json")
+    if os.path.exists(bench_path):
+        try:
+            with open(bench_path, encoding="utf-8") as bf:
+                benchmark = json.load(bf)
+        except Exception:
+            benchmark = None
+    out = {
         "asset_id": asset_id,
         "asset_type": atype,
         "latest_readings": readings,
@@ -145,6 +153,9 @@ def prognostic_tool(asset_id: str) -> dict:
         "failure_probability_30d": round(prob, 3),
         "shap": explain,
     }
+    if benchmark:
+        out["model_benchmark"] = benchmark
+    return out
 
 
 def fault_mode_tool(air_temperature_K: float, process_temperature_K: float,

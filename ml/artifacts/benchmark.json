@@ -1,0 +1,9 @@
+{
+  "dataset": "NASA C-MAPSS FD001",
+  "cap": 125,
+  "models": {
+    "random_forest": 17.01,
+    "xgboost": null
+  },
+  "caveat": "Rotating-equipment analogue benchmark of the estimator class; not a validated steel-plant prediction."
+}

@@ -168,5 +168,58 @@ def test_P1_cmapss_loader_and_features():
         os.unlink(path)
 
 
+@suite.case
+def test_P1_benchmark_rul_writes_artifact_from_cmapss_fixture():
+    from ml.benchmark_rul import run
+    try:
+        import sklearn  # noqa: F401
+    except ImportError:
+        gap("sklearn not installed - C-MAPSS benchmark rung unavailable here")
+    import json
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        train_path = os.path.join(d, "train_FD001.txt")
+        test_path = os.path.join(d, "test_FD001.txt")
+        truth_path = os.path.join(d, "RUL_FD001.txt")
+        out_path = os.path.join(d, "benchmark.json")
+        with open(train_path, "w", encoding="utf-8") as f:
+            f.write(_CMAPSS_FIXTURE)
+        with open(test_path, "w", encoding="utf-8") as f:
+            f.write(_CMAPSS_FIXTURE)
+        with open(truth_path, "w", encoding="utf-8") as f:
+            f.write("0\n0\n")
+
+        res = run(data_dir=d, out_path=out_path, emit=False)
+
+        assert os.path.exists(out_path), "benchmark artifact was not written"
+        with open(out_path, encoding="utf-8") as f:
+            written = json.load(f)
+        assert written == res, "returned result and artifact diverged"
+        assert res["dataset"] == "NASA C-MAPSS FD001", res
+        assert "random_forest" in res["models"], res
+        assert "caveat" in res and "steel-plant" in res["caveat"], res
+
+
+@suite.case
+def test_P1_prognostic_surfaces_benchmark():
+    import config as C
+    from agent import tools as T
+
+    bench_path = os.path.join(C.ML_ARTIFACTS_DIR, "benchmark.json")
+    try:
+        out = T.prognostic_tool("GEARBOX-05")
+    except ModuleNotFoundError as e:
+        if e.name == "sklearn":
+            gap("sklearn not installed - sklearn-trained RUL artifact unavailable here")
+        raise
+    if not os.path.exists(bench_path):
+        assert "model_benchmark" not in out, "benchmark surfaced without artifact"
+        gap("benchmark.json absent - run: python -m ml.benchmark_rul")
+    mb = out.get("model_benchmark")
+    assert mb and mb.get("dataset") == "NASA C-MAPSS FD001", mb
+    assert "caveat" in mb, "benchmark must carry its analogue caveat"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

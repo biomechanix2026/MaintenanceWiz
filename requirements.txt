@@ -12,6 +12,7 @@ scikit-learn
 shap
 chromadb
 anthropic
+xgboost        # optional: stronger benchmark variant in ml/benchmark_rul.py
 
 # --- Optional viz niceties ---
 matplotlib

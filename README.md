@@ -65,7 +65,7 @@ streamlit**, and upgrades automatically when the production libraries are presen
 | Prognostics | scikit-learn `RandomForestRegressor` | pure-numpy bagged tree ensemble |
 | Explainability | `shap.TreeExplainer` | model-agnostic ablation attribution |
 | Abnormality detection | sensor z-score + trend detector | same deterministic rule |
-| Retrieval | ChromaDB vector store | numpy TF-IDF cosine index |
+| Retrieval | ChromaDB + BM25 hybrid (RRF) | TF-IDF + BM25 hybrid (numpy/stdlib) |
 | Reasoning | Claude tool-use loop (`ANTHROPIC_API_KEY`) | deterministic Python pipeline |
 
 The deterministic pipeline is also the **reproducible baseline for the eval
@@ -157,10 +157,10 @@ ml/
   model.py                RULModel (sklearn RF or numpy forest) + SHAP/ablation
   train_model.py          trains + saves ml/artifacts/rul_model.pkl
 knowledge/
-  rag.py                  asset-filtered RAG (ChromaDB or TF-IDF)
+  rag.py                  asset-filtered hybrid RAG (ChromaDB/TF-IDF + BM25)
 agent/
   system_prompt.py        the Consolidated-Brain system prompt
-  tools.py                the 11-tool suite (structured outputs)
+  tools.py                the 12-tool suite (structured outputs)
   orchestrator.py         think→act→observe loop (LLM + deterministic)
 app/streamlit_app.py      5-panel dashboard
 scripts/pre_shift_run.py  autonomous pre-shift briefing (cron-friendly)
@@ -197,6 +197,12 @@ evals/judges.py           observability-driven eval judges
   trained classifier — directionally useful, not a calibrated probability.
 - **Priority weights and thresholds are expert-set** (`RISK_WEIGHTS`,
   `PRIORITY_BANDS`, `ALERT_THRESHOLD`, `ANOMALY_*`), not learned.
+- **Benchmark provenance.** The RUL estimator class is benchmarked on NASA
+  C-MAPSS FD001 (`python -m ml.benchmark_rul`; RMSE recorded in
+  `ml/artifacts/benchmark.json`) and the fault classifier on AI4I 2020
+  (UCI 601, CC-BY 4.0). Both are analogues for steel-plant equipment:
+  capability evidence, not validated plant predictions. C-MAPSS: Saxena &
+  Goebel (2008), NASA Prognostics CoE.
 - **The in-memory SQL DB is read-only demo data** rebuilt from the CSVs per
   process; queries cannot mutate it.
 
