@@ -85,7 +85,63 @@ Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1
 (diagnosis, root cause, RUL), 5.2 (constraint-based priority), 5.3 (step-by-step
 actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 
-<!-- T2..T4 inserted by Tasks 3-5 -->
+### T2 · Meera, shift supervisor — "The shift that starts itself"
+
+> *It's 05:45. No one has logged in — but the plant has already been scanned,
+> scored, and the night's new risk routed to the right inboxes.*
+
+![T2 journey map](journeys/t2_map.svg)
+
+#### The journey
+
+1. **The scan runs itself** — *cron, before dawn*: `pre_shift_run` scores all
+   12 assets with the same deterministic tools the chat uses and writes the
+   shift briefing to `reports/`. This morning: **5 assets need
+   attention** (1 critical).
+2. **Alerts are already routed** — CRITICAL findings went to
+   `shift-supervisor@plant.local` per the config role map; HIGH to reliability engineering.
+   Re-running the scan does not re-spam: same asset+band+day is not logged twice.
+3. **Meera reads the briefing** — counts by band, urgent assets in score
+   order, and a drafted work order for each — including long-lead parts to
+   order now.
+
+![Pre-shift briefing](journeys/t2_preshift.png)
+
+4. **She glances across the control room** — the wallboard
+   (`?wallboard=1`) shows the top risk cards in wallboard type, auto-refreshing.
+   Severity is readable from meters away: color + icon + label, never color alone.
+
+![Wallboard](journeys/t2_wallboard.png)
+
+5. **Handover takes minutes, not war stories** — every claim in the meeting
+   traces to the report file; yesterday-vs-today score deltas replace anecdotes.
+
+#### What to notice (judges)
+
+- **Step 1:** the same consolidated brain runs *proactively* — "Systems of
+  Action": work product exists before the first human login.
+- **Step 2:** role routing comes from `config.py`, and dedup is per
+  asset+band+day — alarm fatigue is treated as a safety hazard, not a metric.
+- **Steps 1–5:** zero LLM calls — the deterministic pipeline produced all of
+  it. This demo runs identically with no API key and no network.
+
+#### Demo script (1:30)
+
+| Clock | Action | Expect on screen |
+|---|---|---|
+| 0:00 | Terminal: `python -m scripts.pre_shift_run` | Scan output, report path printed |
+| 0:20 | Open the newest `reports/preshift_*.md` | Counts: 5 need attention, 1 critical |
+| 0:45 | Point at the alert routing line | shift-supervisor@plant.local |
+| 1:00 | Re-run the same command | Dedup: no duplicate alerts |
+| 1:10 | Browser: `http://localhost:8501/?wallboard=1` | Top cards, wallboard type |
+| 1:30 | End | — |
+
+#### Traceability
+
+Demonstrates PDF objectives: 5.4 (reports, alert reports, decision summaries),
+6.7 (real-time alerting), 7 (dashboard, role-based alerts).
+
+<!-- T3..T4 inserted by Tasks 4-5 -->
 
 ---
 
