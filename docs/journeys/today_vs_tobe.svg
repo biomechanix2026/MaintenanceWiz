@@ -1,0 +1,25 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">
+  <title>Today versus to-be journey bridge</title>
+  <text x="24" y="30" font-size="18" font-weight="bold" fill="#1F2937">Same brain, wider intake</text>
+  <text x="64" y="92" font-size="14" font-weight="bold" fill="#1F2937">Today</text>
+  <text x="64" y="202" font-size="14" font-weight="bold" fill="#92400E">To-be</text>
+  <g transform="translate(150,66)">
+    <rect width="170" height="42" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="85" y="26" font-size="12" fill="#1F2937" text-anchor="middle">ranked board</text>
+    <rect x="184" width="170" height="42" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="269" y="26" font-size="12" fill="#1F2937" text-anchor="middle">five-block diagnosis</text>
+    <rect x="368" width="170" height="42" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="453" y="26" font-size="12" fill="#1F2937" text-anchor="middle">constraint flip</text>
+    <rect x="552" width="170" height="42" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="637" y="26" font-size="12" fill="#1F2937" text-anchor="middle">pre-shift autonomy</text>
+    <rect x="736" width="170" height="42" rx="8" fill="#F8FAFC" stroke="#94A3B8"/><text x="821" y="26" font-size="12" fill="#1F2937" text-anchor="middle">feedback loop</text>
+  </g>
+  <line x1="600" y1="128" x2="600" y2="166" stroke="#D97706" stroke-width="2" marker-end="url(#down)"/>
+  <text x="630" y="150" font-size="12" fill="#92400E">same brain, wider intake</text>
+  <g transform="translate(150,176)">
+    <rect width="170" height="42" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/><text x="85" y="26" font-size="12" fill="#1F2937" text-anchor="middle">IW38 orders in</text>
+    <rect x="184" width="170" height="42" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/><text x="269" y="26" font-size="12" fill="#1F2937" text-anchor="middle">conversational logging</text>
+    <rect x="368" width="170" height="42" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/><text x="453" y="26" font-size="12" fill="#1F2937" text-anchor="middle">daily signoff</text>
+    <rect x="552" width="170" height="42" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/><text x="637" y="26" font-size="12" fill="#1F2937" text-anchor="middle">field capture</text>
+    <rect x="736" width="170" height="42" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/><text x="821" y="26" font-size="12" fill="#1F2937" text-anchor="middle">legacy docs ingested</text>
+  </g>
+  <defs>
+    <marker id="down" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto"><path d="M0,0 L8,0 L4,8 z" fill="#D97706"/></marker>
+  </defs>
+</svg>

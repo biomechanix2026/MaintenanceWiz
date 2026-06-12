@@ -255,13 +255,126 @@ Demonstrates PDF objectives: 5.2 (risk bands, plant bottleneck), 6.4
 
 # Part 2 — To-be (ROADMAP)
 
-<!-- F1..F2 inserted by Task 6 -->
+![Today versus to-be](journeys/today_vs_tobe.svg)
+
+## F1 · Shalini — "One inbox for the plant"
+
+> **ROADMAP — nothing in this journey is built yet.** It exists to drive
+> planning; see the gap table.
+
+> *Shalini runs the plant from three places that don't talk: IW38 in SAP, the
+> HMI wall, and a Word file called breakdowns_final_v7.docx.*
+
+![F1 journey map](journeys/f1_map.svg)
+
+### The journey
+
+1. **Shalini asks what needs her today** — *manager copilot*. A plant-scope
+   briefing spans work orders, risk, and KPIs instead of one asset at a time.
+2. **Yesterday's IW38 export is already in** — SAP order CSVs become a governed
+   work-order table, not a manual paste into a deck.
+3. **She logs a breakdown conversationally** — "log a 40-min breakdown on belt
+   3, bearing noise" becomes a cited, asset-linked delay record.
+4. **She signs off the day's tasks by name** — identity and a signoff gate move
+   daily management from memory to an auditable board.
+5. **The legacy Word file is no longer a dead end** —
+   `breakdowns_final_v7.docx` is ingested once, then searchable as incident and
+   RAG context.
+
+![F1 storyboard](journeys/f1_storyboard.svg)
+
+### What to notice (judges)
+
+- **Same brain, wider intake:** Part 1 proves the reasoning loop; F1 widens the
+  data contracts around it.
+- **Writes stay gated:** conversational logging routes intent to a reviewable
+  write path, not free-form mutation.
+- **The roadmap has names:** every gap maps to an existing research section or a
+  proposed `NEW-*` feature.
+
+Demo: 30-second storyboard walkthrough of the frames below.
+
+### Gap table
+
+| Journey step | Missing today | Feature that closes it | Link | Effort |
+|---|---|---|---|---|
+| 1 Morning briefing | Plant-scope chat (today's pipeline is per-asset) | Governed manager copilot | FEATURE_RESEARCH §3.5 | M |
+| 2 IW38 ingestion | SAP adapter + work-order data contract | **NEW-1** SAP IW38 CSV adapter | NEW | M |
+| 3 Conversational logging | Intent router + gated write path beyond feedback | **NEW-3** Conversational intake intent router | NEW | M |
+| 4 Daily signoff | User identity; task list; signoff gate | **NEW-4** Identity & signoff · **NEW-5** Daily management board | NEW | M–L |
+| 5 Legacy docs | docx/xlsx parsers → incidents/corpus | **NEW-2** Legacy document ingestion | NEW | S–M |
+
+### Traceability
+
+Planning extension of PDF objectives: 4.3 (ERP/manuals/logs), 5.4 (decision
+summaries), 6.4 (audit trail), 7 (dashboard).
+
+## F2 · Arjun — "The wrench doesn't stop for paperwork"
+
+> **ROADMAP — nothing in this journey is built yet.** It exists to drive
+> planning; see the gap table.
+
+> *A coupling lets go mid-shift. The fix takes forty minutes; today the
+> paperwork takes longer.*
+
+![F2 journey map](journeys/f2_map.svg)
+
+### The journey
+
+1. **Arjun scans the asset QR** — *mobile-lite deep link*. The phone opens the
+   relevant asset deep-dive instead of a desktop dashboard.
+2. **He reads the SOP with gloves on** — asset-filtered retrieval becomes a
+   48px-target checklist.
+3. **He says what he sees and snaps two photos** — voice note plus photo
+   evidence becomes a structured breakdown record.
+4. **He ticks isolation steps as he works** — checklist state carries forward
+   into closure, so proof is captured during the job.
+5. **He signs off once at shift end** — named identity writes the logbook entry;
+   there is no retyping into another system.
+
+![F2 storyboard](journeys/f2_storyboard.svg)
+
+### What to notice (judges)
+
+- **Field capture is not a second app:** it is the same traceable maintenance
+  brain with a mobile intake surface.
+- **Paperwork disappears into the workflow:** evidence is collected while work
+  happens, not reconstructed later.
+- **The gap is bounded:** this is the mobile-lite subset, not a full PWA rewrite.
+
+Demo: 30-second storyboard walkthrough of the frames below.
+
+### Gap table
+
+| Journey step | Missing today | Feature that closes it | Link | Effort |
+|---|---|---|---|---|
+| 1 QR deep link | `?asset=` query param + printable QR codes | Mobile-lite subset | FEATURE_RESEARCH §3.9 | S |
+| 2 Glove-first SOP view | Mobile layout per UIUX spec | Mobile-lite subset | FEATURE_RESEARCH §3.9 | S–M |
+| 3 Voice + photo capture | Mic input; `st.camera_input` → logbook attachment | Mobile-lite subset | FEATURE_RESEARCH §3.9 | S |
+| 4 Checklist carry | Persist ticked steps into closure | Mobile-lite subset / UIUX §4 | FEATURE_RESEARCH §3.9 | S |
+| 5 Shift signoff | User identity; named closure | **NEW-4** Identity & signoff | NEW | M |
+
+### Traceability
+
+Planning extension of PDF objectives: 4.4 (natural-language intake), 5.3
+(step-by-step actions), 5.4 (digital log), 6.4 (audit trail).
 
 ---
 
 # Additions proposed for FEATURE_RESEARCH.md
 
-<!-- filled by Task 6 -->
+The F-journeys surface five features the research doesn't yet contain:
+
+1. **NEW-1 · SAP IW38 CSV adapter** — ingest maintenance + calibration order
+   exports via the existing CSV-contract seam (ARCHITECTURE_DESIGN §5.2).
+2. **NEW-2 · Legacy document ingestion** — Word/Excel breakdown logs →
+   incidents table + RAG corpus, one-time migration per asset.
+3. **NEW-3 · Conversational intake intent router** — classify a field message
+   (breakdown / reading / order reference / closure) and write to the correct
+   table through a gated, cited path.
+4. **NEW-4 · User identity & signoff** — named closures and a signoff gate
+   (today everything is signed "engineer").
+5. **NEW-5 · Daily management board** — today's tasks, signoff state, exceptions.
 
 # Deck hooks
 

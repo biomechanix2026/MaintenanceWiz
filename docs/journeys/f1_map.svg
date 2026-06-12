@@ -1,0 +1,53 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">
+  <title>F1 · Shalini — one inbox for the plant (ROADMAP)</title>
+  <text x="16" y="26" font-size="16" font-weight="bold" fill="#1F2937">F1 · Shalini — one inbox for the plant (ROADMAP)</text>
+  <rect x="1080" y="8" width="104" height="24" rx="12" fill="#D97706"/>
+  <text x="1132" y="24" font-size="11" font-weight="bold" fill="#fff" text-anchor="middle">ROADMAP</text>
+  <line x1="60" y1="160" x2="1140" y2="160" stroke="#D97706" stroke-width="2" stroke-dasharray="6 3"/>
+  <g>
+    <circle cx="160" cy="160" r="6" fill="#D97706"/>
+    <rect x="70" y="54" width="180" height="84" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="160" y="78" font-size="10" fill="#1F2937" text-anchor="middle">Morning briefing:</text>
+    <text x="160" y="94" font-size="10" fill="#1F2937" text-anchor="middle">"what needs me today?"</text>
+    <rect x="70" y="190" width="180" height="58" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="160" y="212" font-size="10" fill="#1F2937" text-anchor="middle">plant-scope copilot</text>
+    <text x="160" y="228" font-size="10" fill="#1F2937" text-anchor="middle">orders + risk + KPIs</text>
+  </g>
+  <g>
+    <circle cx="380" cy="160" r="6" fill="#D97706"/>
+    <rect x="290" y="54" width="180" height="84" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="380" y="78" font-size="10" fill="#1F2937" text-anchor="middle">Yesterday's IW38 export</text>
+    <text x="380" y="94" font-size="10" fill="#1F2937" text-anchor="middle">already ingested</text>
+    <rect x="290" y="190" width="180" height="58" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="380" y="212" font-size="10" fill="#1F2937" text-anchor="middle">SAP order list → CSV</text>
+    <text x="380" y="228" font-size="10" fill="#1F2937" text-anchor="middle">adapter → work orders</text>
+  </g>
+  <g>
+    <circle cx="600" cy="160" r="8" fill="#D97706"/>
+    <rect x="500" y="46" width="200" height="94" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-width="2" stroke-dasharray="6 3"/>
+    <text x="600" y="68" font-size="10" font-weight="bold" fill="#1F2937" text-anchor="middle">★ "Log a 40-min breakdown</text>
+    <text x="600" y="84" font-size="10" font-weight="bold" fill="#1F2937" text-anchor="middle">on belt 3, bearing noise"</text>
+    <text x="600" y="104" font-size="10" fill="#92400E" text-anchor="middle">filed, not typed into Excel</text>
+    <rect x="500" y="190" width="200" height="58" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="600" y="212" font-size="10" fill="#1F2937" text-anchor="middle">intent router → delays table</text>
+    <text x="600" y="228" font-size="10" fill="#1F2937" text-anchor="middle">asset-linked, cited</text>
+  </g>
+  <g>
+    <circle cx="820" cy="160" r="6" fill="#D97706"/>
+    <rect x="730" y="54" width="180" height="84" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="820" y="78" font-size="10" fill="#1F2937" text-anchor="middle">Signs off the day's</text>
+    <text x="820" y="94" font-size="10" fill="#1F2937" text-anchor="middle">tasks by name</text>
+    <rect x="730" y="190" width="180" height="58" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="820" y="212" font-size="10" fill="#1F2937" text-anchor="middle">identity + signoff gate</text>
+    <text x="820" y="228" font-size="10" fill="#1F2937" text-anchor="middle">daily management board</text>
+  </g>
+  <g>
+    <circle cx="1040" cy="160" r="6" fill="#D97706"/>
+    <rect x="950" y="54" width="180" height="84" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="1040" y="78" font-size="10" fill="#1F2937" text-anchor="middle">breakdowns_final_v7.docx</text>
+    <text x="1040" y="94" font-size="10" fill="#1F2937" text-anchor="middle">ingested once</text>
+    <rect x="950" y="190" width="180" height="58" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="1040" y="212" font-size="10" fill="#1F2937" text-anchor="middle">document ingestion →</text>
+    <text x="1040" y="228" font-size="10" fill="#1F2937" text-anchor="middle">incidents + RAG corpus</text>
+  </g>
+</svg>

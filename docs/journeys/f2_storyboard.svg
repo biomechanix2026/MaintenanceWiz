@@ -1,0 +1,37 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">
+  <title>F2 roadmap storyboard</title>
+  <text x="24" y="32" font-size="18" font-weight="bold" fill="#1F2937">F2 storyboard — the wrench doesn't stop for paperwork</text>
+  <g transform="translate(40,60)">
+    <rect width="340" height="260" rx="10" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <rect x="226" y="14" width="90" height="22" rx="11" fill="#D97706"/><text x="271" y="29" font-size="10" fill="#fff" text-anchor="middle">ROADMAP</text>
+    <rect x="68" y="52" width="120" height="190" rx="16" fill="#fff" stroke="#D97706" stroke-dasharray="6 3"/>
+    <rect x="92" y="84" width="72" height="72" fill="none" stroke="#1F2937" stroke-width="2"/>
+    <path d="M96 96h20v20H96zm44 0h20v20h-20zM96 140h20v20H96zm44 44h20v20h-20z" fill="#1F2937"/>
+    <path d="M226 104h70v88h-70z" fill="#FEF3C7" stroke="#D97706" stroke-dasharray="6 3"/>
+    <circle cx="248" cy="142" r="12" fill="#D97706"/>
+    <text x="261" y="216" font-size="12" fill="#1F2937" text-anchor="middle">Scan asset QR</text>
+  </g>
+  <g transform="translate(430,60)">
+    <rect width="340" height="260" rx="10" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <rect x="226" y="14" width="90" height="22" rx="11" fill="#D97706"/><text x="271" y="29" font-size="10" fill="#fff" text-anchor="middle">ROADMAP</text>
+    <circle cx="58" cy="86" r="24" fill="#D97706"/><text x="58" y="94" font-size="22" fill="#fff" text-anchor="middle">🎙</text>
+    <rect x="96" y="58" width="204" height="64" rx="10" fill="#fff" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="112" y="84" font-size="12" fill="#1F2937">"seal leak at startup,</text>
+    <text x="112" y="102" font-size="12" fill="#1F2937">coupling hot"</text>
+    <rect x="72" y="154" width="78" height="58" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-dasharray="6 3"/>
+    <rect x="178" y="154" width="78" height="58" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-dasharray="6 3"/>
+    <text x="164" y="236" font-size="12" fill="#1F2937" text-anchor="middle">attached to GEARBOX-05</text>
+  </g>
+  <g transform="translate(820,60)">
+    <rect width="340" height="260" rx="10" fill="#FFFBEB" stroke="#D97706" stroke-dasharray="6 3"/>
+    <rect x="226" y="14" width="90" height="22" rx="11" fill="#D97706"/><text x="271" y="29" font-size="10" fill="#fff" text-anchor="middle">ROADMAP</text>
+    <text x="46" y="70" font-size="13" font-weight="bold" fill="#1F2937">Checklist 5/5</text>
+    <text x="48" y="104" font-size="13" fill="#047857">✓ LOTO verified</text>
+    <text x="48" y="132" font-size="13" fill="#047857">✓ Guard removed</text>
+    <text x="48" y="160" font-size="13" fill="#047857">✓ Parts recorded</text>
+    <text x="48" y="188" font-size="13" fill="#047857">✓ Photos attached</text>
+    <text x="48" y="216" font-size="13" fill="#047857">✓ Follow-up scheduled</text>
+    <rect x="190" y="190" width="112" height="34" rx="8" fill="#D97706"/>
+    <text x="246" y="212" font-size="12" fill="#fff" text-anchor="middle">Arjun ✓</text>
+  </g>
+</svg>
