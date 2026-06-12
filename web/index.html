@@ -89,12 +89,15 @@ function escapeHtml(s) {
 
 // Minimal renderer for the five-block markdown contract: escape first,
 // then headers / bold / inline code / blockquotes / line breaks only.
+// Fence lines (```) are dropped: models sometimes wrap the whole answer in
+// them, and a naive backtick regex would render everything as code.
 function renderMd(text) {
   return escapeHtml(text)
+    .replace(/^```.*$/gm, "")
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+    .replace(/`([^`\n]+)`/g, "<code>$1</code>")
     .replace(/\n/g, "<br>");
 }
 
