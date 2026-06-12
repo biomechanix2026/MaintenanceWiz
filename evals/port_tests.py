@@ -140,5 +140,33 @@ def test_P2_fault_tool_in_both_registries():
     assert any(s["name"] == "fault_mode_tool" for s in TOOL_SCHEMAS), "missing from TOOL_SCHEMAS"
 
 
+_CMAPSS_FIXTURE = "\n".join(
+    f"{unit} {cycle} 0.0 0.0 100.0 " + " ".join(str(float(10 * s + cycle)) for s in range(1, 22))
+    for unit in (1, 2) for cycle in range(1, 11))
+
+
+@suite.case
+def test_P1_cmapss_loader_and_features():
+    import tempfile
+    from ml.cmapss import load_cmapss, add_rul_labels, build_features, last_cycle_rows
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+        f.write(_CMAPSS_FIXTURE)
+        path = f.name
+    try:
+        df = load_cmapss(path)
+        assert list(df.columns[:5]) == ["unit", "cycle", "op1", "op2", "op3"]
+        assert df.unit.nunique() == 2 and len(df) == 20
+        df = add_rul_labels(df, cap=125)
+        assert df[df.cycle == 10].rul.tolist() == [0, 0], "last cycle RUL must be 0"
+        assert df[df.cycle == 1].rul.tolist() == [9, 9]
+        feats, cols = build_features(df, window=3)
+        assert any(c.endswith("_rmean") for c in cols) and any(c.endswith("_rstd") for c in cols)
+        assert "cycle" in cols
+        last = last_cycle_rows(feats)
+        assert len(last) == 2 and set(last.cycle) == {10}
+    finally:
+        os.unlink(path)
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))
