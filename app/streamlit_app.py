@@ -49,7 +49,7 @@ def registry():
     return pd.read_csv(C.ASSET_REGISTRY_CSV)
 
 
-@st.cache_data(show_spinner="Scoring all assets...")
+@st.cache_data(ttl=300, show_spinner="Scoring all assets...")
 def plant_scan():
     rows = []
     reg = registry()
@@ -109,6 +109,7 @@ def _wallboard_card_html(row) -> str:
 
 
 def _render_wallboard_body():
+    plant_scan.clear()
     df = plant_scan().head(6)
     if df.empty:
         st.info("No plant scan rows available.")
