@@ -73,7 +73,9 @@ def _to_float(value, default=0.0) -> float:
         return default
 
 
-def _fmt_number(value, digits=1) -> str:
+def _fmt_number(value, digits=1, missing="n/a") -> str:
+    if _is_missing(value):
+        return missing
     num = _to_float(value)
     if abs(num - round(num)) < 0.05:
         return f"{round(num):.0f}"
@@ -115,7 +117,8 @@ def _freshness(timestamp) -> tuple[str, str]:
         css_class = "mw-fresh--red"
     elif age > datetime.timedelta(hours=2):
         css_class = "mw-fresh--amber"
-    return timestamp.strftime("%H:%M"), css_class
+    label = timestamp.strftime("%Y-%m-%d %H:%M") if age >= datetime.timedelta(days=1) else timestamp.strftime("%H:%M")
+    return label, css_class
 
 
 def _alerts_sent_today() -> int:
@@ -136,13 +139,14 @@ def _alerts_sent_today() -> int:
 
 
 def status_strip(engine_mode, model_kind):
+    mode = "llm" if str(engine_mode).lower().startswith("llm") else "deterministic"
     log = sensor_log()
     time_label, fresh_class = _freshness(_latest_sensor_timestamp(log))
     alerts_today = _alerts_sent_today()
     st.markdown(
         f"""
         <div class="mw-strip">
-          <div>{TH.mode_badge(engine_mode)} <span class="mw-chip" style="background:#242932;color:#E8EAED">prognostic model: {TH.esc(model_kind)}</span></div>
+          <div>{TH.mode_badge(mode)} <span class="mw-chip" style="background:#242932;color:#E8EAED">prognostic model: {TH.esc(model_kind)}</span></div>
           <div class="mw-mono" style="display:flex;gap:.9rem;flex-wrap:wrap">
             <span class="{fresh_class}">data as of {TH.esc(time_label)}</span>
             <span>alerts sent today: {alerts_today}</span>
@@ -392,18 +396,22 @@ def five_block_answer(md, asset_id, turn_idx):
                 st.markdown(rest)
 
 
-def candidate_chips(turn, idx, on_pick):
-    trace = turn.get("trace") or []
-    candidates = []
-    for step in trace:
+def _trace_candidates(trace):
+    for step in trace or []:
         if step.get("tool") != "resolve_asset":
             continue
         output = step.get("output") or {}
         if isinstance(output, dict):
-            candidates = output.get("candidates") or []
-        elif isinstance(output, list):
-            candidates = output
-        break
+            return output.get("candidates") or []
+        if isinstance(output, list):
+            return output
+        return []
+    return []
+
+
+def candidate_chips(turn, idx, on_pick):
+    trace = turn.get("trace") or []
+    candidates = _trace_candidates(trace)
 
     for candidate in candidates:
         asset_id = _row_value(candidate, "asset_id", default="")
@@ -421,9 +429,17 @@ def _render_alert_controls(turn, idx, on_dispatch):
 
     result = turn.get("alert_result")
     if result is None:
-        st.warning("Alert recommended. Confirm dispatch before sending notifications.")
-        confirmed = st.checkbox("I confirm this alert should be dispatched", key=f"alert_confirm_{idx}")
-        if st.button("Dispatch alert", key=f"alert_dispatch_{idx}", disabled=not confirmed):
+        risk = structured.get("risk") or {}
+        band = str(risk.get("priority_band") or "").upper()
+        if "CRITICAL" in band:
+            recipient = C.ALERT_ROLES["supervisor"]
+        elif band == "HIGH":
+            recipient = C.ALERT_ROLES["reliability"]
+        else:
+            recipient = C.ALERT_ROLES["maintenance"]
+        st.warning(f"Auto-alert recommended -> would route to {recipient}.")
+        confirmed = st.checkbox("Confirm dispatch", key=f"adc_{idx}")
+        if st.button("Dispatch alert", key=f"adb_{idx}", disabled=not confirmed):
             on_dispatch(idx)
         return
 
@@ -438,7 +454,7 @@ def _render_alert_controls(turn, idx, on_dispatch):
         ts = result.get("ts") or result.get("timestamp") or "unknown time"
         st.success(f"Alert dispatched to {recipients_text or 'configured recipients'} at {ts}.")
     elif deduped:
-        st.info("Duplicate alert muted; prior dispatch is still active.")
+        st.info("already alerted today - deduped")
     else:
         st.info("Alert dispatch result recorded.")
 
@@ -459,8 +475,8 @@ def render_assistant_turn(turn, idx, on_pick, on_dispatch):
         with st.expander("Citations", expanded=False):
             for cite in citations:
                 cited_text = _row_value(cite, "cited_text", "text", default="")
-                source = _row_value(cite, "source", "title", default="source")
-                title = _row_value(cite, "title", default=source)
+                title = _row_value(cite, "document_title", "title", "source", default="source")
+                source = _row_value(cite, "source", "document_index", default=title)
                 st.markdown(f"- **{title}** ({source}): {cited_text}")
 
     trace = turn.get("trace") or []
@@ -475,7 +491,7 @@ def render_assistant_turn(turn, idx, on_pick, on_dispatch):
             if isinstance(output, dict) and output.get("sql"):
                 st.code(output["sql"], language="sql")
 
-    if turn.get("pending_query"):
+    if turn.get("pending_query") or _trace_candidates(trace):
         candidate_chips(turn, idx, on_pick)
 
     _render_alert_controls(turn, idx, on_dispatch)
