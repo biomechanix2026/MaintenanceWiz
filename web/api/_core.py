@@ -352,18 +352,22 @@ def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
                 "sources": [], "stop_reason": "tool_round_limit"}
     model = MODEL
     for _ in range(MAX_TOOL_ROUNDS):
-        # Free-tier flash returns 503 under load spikes: retry once, then
-        # degrade to the lite model for the remainder of this turn.
+        # Free-tier flash 503s under load spikes and 429s at 5 req/min/model
+        # (one agentic turn is 3-6 requests). Quota is per model, so after one
+        # retry we degrade to the lite model for the remainder of this turn.
         try:
             response = client.models.generate_content(
                 model=model, contents=contents, config=config_)
-        except errors.ServerError:
+        except errors.APIError as e:
+            if e.code not in (429, 500, 502, 503, 504):
+                raise
             time.sleep(2)
             try:
                 response = client.models.generate_content(
                     model=model, contents=contents, config=config_)
-            except errors.ServerError:
-                if model == FALLBACK_MODEL:
+            except errors.APIError as e2:
+                if (e2.code not in (429, 500, 502, 503, 504)
+                        or model == FALLBACK_MODEL):
                     raise
                 model = FALLBACK_MODEL
                 response = client.models.generate_content(
