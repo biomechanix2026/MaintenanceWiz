@@ -25,6 +25,7 @@ import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
+from app import theme as TH, components as UI
 from agent import tools as T
 from agent.orchestrator import run_agent
 from agent.tools import (risk_score_tool, prognostic_tool, inventory_tool,
@@ -34,6 +35,7 @@ from agent.tools import (risk_score_tool, prognostic_tool, inventory_tool,
 from ml.model import load_model
 
 st.set_page_config(page_title="Maintenance Wizard", page_icon="🛠️", layout="wide")
+TH.inject()
 
 BAND_COLOR = {"CRITICAL": "#c0392b", "HIGH": "#e67e22",
               "MEDIUM": "#f1c40f", "LOW": "#27ae60"}
@@ -46,6 +48,7 @@ BAND_COLOR = {"CRITICAL": "#c0392b", "HIGH": "#e67e22",
 def registry():
     return pd.read_csv(C.ASSET_REGISTRY_CSV)
 
+
 @st.cache_data(show_spinner="Scoring all assets...")
 def plant_scan():
     rows = []
@@ -53,12 +56,15 @@ def plant_scan():
     for _, a in reg.iterrows():
         r = risk_score_tool(a["asset_id"])
         abn = abnormality_tool(a["asset_id"])
+        constraint_flag = r.get("constraint_flag")
         rows.append({
             "asset_id": a["asset_id"], "name": a["name"], "line": a["line"],
             "criticality": a["criticality"], "priority_score": r["priority_score"],
-            "band": r["priority_band"], "rul_days": r["rul_days"],
-            "anomaly_status": abn["status"], "anomaly_score": abn["anomaly_score"],
-            "constraint": "⚠️" if r.get("constraint_flag") else "",
+            "band": r["priority_band"], "priority_band": r["priority_band"],
+            "rul_days": r["rul_days"], "anomaly_status": abn["status"],
+            "anomaly_score": abn["anomaly_score"],
+            "constraint_flag": constraint_flag,
+            "constraint": "⚠️" if constraint_flag else "",
         })
     return pd.DataFrame(rows).sort_values("priority_score", ascending=False)
 
@@ -67,49 +73,212 @@ def band_badge(band):
     return f"<span style='background:{BAND_COLOR[band]};color:white;padding:2px 10px;border-radius:10px;font-weight:600'>{band}</span>"
 
 
-# --------------------------------------------------------------------------
-# Header
-# --------------------------------------------------------------------------
-mode = "LLM (Claude)" if os.environ.get("ANTHROPIC_API_KEY") else "Deterministic (offline)"
+def _fmt_rul(value):
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    return f"{num:.0f} d"
+
+
+def _wallboard_card_html(row) -> str:
+    asset_id = str(row.get("asset_id", ""))
+    name = str(row.get("name", "Unknown asset"))
+    line = str(row.get("line", "Unknown line"))
+    band = str(row.get("priority_band", row.get("band", "LOW"))).upper()
+    anomaly = str(row.get("anomaly_status", "NORMAL")).upper()
+    score = int(round(float(row.get("priority_score", 0) or 0)))
+    constraint_html = ""
+    if row.get("constraint_flag"):
+        constraint_html = f"<div style='margin-top:.7rem'>{TH.constraint_chip()}</div>"
+
+    return f"""
+      <div class="mw-card {'mw-card--critical' if band == 'CRITICAL' else ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
+          <div>{TH.chip(band)}</div>
+          <div class="mw-mono" style="font-size:1.35rem;font-weight:800">{score:02d}/100</div>
+        </div>
+        <div style="margin-top:.85rem;font-size:1.05rem;font-weight:800">{TH.esc(asset_id)} · {TH.esc(name)} · {TH.esc(line)}</div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
+          <span class="mw-mono">RUL {TH.esc(_fmt_rul(row.get("rul_days")))}</span>
+          {TH.anomaly_chip(anomaly)}
+        </div>
+        {constraint_html}
+      </div>
+    """
+
+
+def _render_wallboard_body():
+    df = plant_scan().head(6)
+    if df.empty:
+        st.info("No plant scan rows available.")
+        return
+
+    cards = "\n".join(_wallboard_card_html(row) for _, row in df.iterrows())
+    st.markdown(
+        f"""
+        <style>
+          body:has(.mw-wall) .block-container {{
+            max-width: min(112rem, 98vw);
+            padding-top: 1rem;
+          }}
+          .mw-wall {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+          }}
+          @media (max-width: 64rem) {{
+            .mw-wall {{
+              grid-template-columns: 1fr;
+            }}
+          }}
+        </style>
+        <div class="mw-wall">
+          {cards}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+if hasattr(st, "fragment"):
+    render_wallboard = st.fragment(run_every=300)(_render_wallboard_body)
+else:
+    def render_wallboard():
+        st.markdown('<meta http-equiv="refresh" content="300">', unsafe_allow_html=True)
+        _render_wallboard_body()
+
+
+def _kpi_card(label: str, value: int):
+    st.markdown(
+        f"""
+        <div class="mw-card" style="box-shadow:none">
+          <div class="mw-num">{int(value)}</div>
+          <div style="color:var(--mw-muted);font-weight:800;text-transform:uppercase">{TH.esc(label)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_kpi_row(df: pd.DataFrame):
+    metrics = [
+        ("Assets monitored", len(df)),
+        ("Critical", int((df.band == "CRITICAL").sum())),
+        ("High", int((df.band == "HIGH").sum())),
+        ("Abnormal", int((df.anomaly_status != "NORMAL").sum())),
+        ("Constraint-flagged", int(df.constraint_flag.notna().sum())),
+    ]
+    for col, (label, value) in zip(st.columns(5), metrics):
+        with col:
+            _kpi_card(label, value)
+
+
+def _with_asset_types(df: pd.DataFrame) -> pd.DataFrame:
+    types = registry()[["asset_id", "type"]]
+    return df.merge(types, on="asset_id", how="left")
+
+
+def _ordered_bands(values) -> list[str]:
+    config_order = [band for _, band in C.PRIORITY_BANDS]
+    present = {str(v) for v in values if pd.notna(v)}
+    return [band for band in config_order if band in present]
+
+
+def _render_asset_grid(df: pd.DataFrame):
+    if df.empty:
+        st.info("No assets match the current filters.")
+        return
+
+    critical = df[df.band == "CRITICAL"]
+    remainder = df[df.band != "CRITICAL"]
+
+    for _, row in critical.iterrows():
+        UI.asset_card(row, full_width=True)
+
+    if not remainder.empty:
+        cols = st.columns(3)
+        for idx, (_, row) in enumerate(remainder.iterrows()):
+            with cols[idx % 3]:
+                UI.asset_card(row)
+
+
+def _render_density_view(df: pd.DataFrame):
+    columns = [
+        "asset_id", "name", "type", "line", "criticality", "priority_score",
+        "band", "rul_days", "anomaly_status", "anomaly_score", "constraint",
+    ]
+    table = df[columns].rename(columns={
+        "asset_id": "Asset",
+        "name": "Name",
+        "type": "Type",
+        "line": "Line",
+        "criticality": "Criticality",
+        "priority_score": "Priority",
+        "band": "Band",
+        "rul_days": "RUL (d)",
+        "anomaly_status": "Anomaly",
+        "anomaly_score": "Anomaly Score",
+        "constraint": "Flag",
+    })
+    st.dataframe(table, hide_index=True, use_container_width=True)
+
+
+if st.query_params.get("wallboard") == "1":
+    render_wallboard()
+    st.stop()
+
 model = load_model()
-st.title("🛠️ Maintenance Wizard")
-st.caption(f"Consolidated-Brain agent for a heavy steel plant · engine mode: **{mode}** · "
-           f"prognostic model: **{model.kind}** · {datetime.now():%Y-%m-%d %H:%M}")
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["📊 Plant Bottleneck", "🔬 Asset Deep-Dive", "💬 Wizard Chat",
-     "🌅 Pre-Shift Report", "📒 Digital Logbook"])
+engine_mode = "llm" if os.environ.get("ANTHROPIC_API_KEY") else "deterministic"
+UI.status_strip(engine_mode, model.kind)
+view = UI.nav()
 
 
 # ==========================================================================
-# TAB 1 - Plant Bottleneck View
+# VIEW 1 - Plant Bottleneck View
 # ==========================================================================
-with tab1:
+if view == UI.VIEWS[0]:
     st.subheader("Plant-wide triage")
-    df = plant_scan()
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Assets monitored", len(df))
-    c2.metric("Critical", int((df.band == "CRITICAL").sum()))
-    c3.metric("High", int((df.band == "HIGH").sum()))
-    c4.metric("Abnormal", int((df.anomaly_status != "NORMAL").sum()))
-    c5.metric("Constraint-flagged", int((df.constraint == "⚠️").sum()))
+    df = _with_asset_types(plant_scan())
+    _render_kpi_row(df)
 
-    st.bar_chart(df.set_index("asset_id")["priority_score"], height=260)
-    st.dataframe(
-        df.rename(columns={"asset_id": "Asset", "name": "Name", "line": "Line",
-                           "priority_score": "Priority", "band": "Band",
-                           "rul_days": "RUL (d)", "anomaly_status": "Anomaly",
-                           "anomaly_score": "Anomaly Score", "constraint": "Flag"}),
-        hide_index=True, use_container_width=True)
-    st.caption("⚠️ = part lead time exceeds predicted RUL → repair cannot complete "
+    band_options = _ordered_bands(df["band"])
+    type_options = sorted(df["type"].dropna().unique().tolist())
+    line_options = sorted(df["line"].dropna().unique().tolist())
+
+    f1, f2, f3, f4 = st.columns([2, 2, 2, 1])
+    with f1:
+        bands = st.multiselect("Band", band_options, default=band_options)
+    with f2:
+        types = st.multiselect("Type", type_options, default=type_options)
+    with f3:
+        lines = st.multiselect("Line", line_options, default=line_options)
+    with f4:
+        st.write("")
+        if st.button("⟳ Rescan", use_container_width=True):
+            plant_scan.clear()
+            UI.clear_data_caches()
+            st.rerun()
+
+    filtered = df[
+        df["band"].isin(bands)
+        & df["type"].isin(types)
+        & df["line"].isin(lines)
+    ].sort_values("priority_score", ascending=False)
+
+    _render_asset_grid(filtered)
+    st.caption("⚠️ = part lead time exceeds predicted RUL -> repair cannot complete "
                "in time; the agent switches to a monitored-degradation strategy. "
                "Anomaly is an independent sensor-deviation early-warning signal.")
 
+    with st.expander("Engineer density view"):
+        _render_density_view(filtered)
+
 
 # ==========================================================================
-# TAB 2 - Asset Deep-Dive (interactive workbook)
+# VIEW 2 - Asset Deep-Dive (interactive workbook)
 # ==========================================================================
-with tab2:
+if view == UI.VIEWS[1]:
     reg = registry()
     aid = st.selectbox("Asset", reg.asset_id, key="deep_asset")
     arow = reg[reg.asset_id == aid].iloc[0]
@@ -161,9 +330,9 @@ with tab2:
 
 
 # ==========================================================================
-# TAB 3 - Wizard Chat
+# VIEW 3 - Wizard Chat
 # ==========================================================================
-with tab3:
+if view == UI.VIEWS[2]:
     st.subheader("Ask the Wizard")
     st.caption("Try: *what's wrong with the mill gearbox?* · "
                "*that valve that keeps leaking on the caster* · *cooling pump status*")
@@ -180,7 +349,7 @@ with tab3:
         with st.chat_message("user"):
             st.markdown(q)
         with st.chat_message("assistant"):
-            with st.spinner("Thinking → acting → observing..."):
+            with st.spinner("Thinking -> acting -> observing..."):
                 # Pass prior turns + the asset in focus so follow-ups
                 # ("what about its bearings?") stay context-aware.
                 history = st.session_state.chat[:-1]
@@ -197,9 +366,9 @@ with tab3:
 
 
 # ==========================================================================
-# TAB 4 - Pre-Shift Report (System of Action: work done before you log in)
+# VIEW 4 - Pre-Shift Report (System of Action: work done before you log in)
 # ==========================================================================
-with tab4:
+if view == UI.VIEWS[3]:
     st.subheader("🌅 Pre-shift autonomous report")
     st.caption("Generated by the agent on a schedule — before anyone logs in. "
                "Every flagged asset already has a drafted work order.")
@@ -229,9 +398,9 @@ with tab4:
 
 
 # ==========================================================================
-# TAB 5 - Digital Logbook + closure checklist (loop closure / compliance)
+# VIEW 5 - Digital Logbook + closure checklist (loop closure / compliance)
 # ==========================================================================
-with tab5:
+if view == UI.VIEWS[4]:
     st.subheader("📒 Digital logbook & job closure")
     reg = registry()
     aid = st.selectbox("Asset", reg.asset_id,
