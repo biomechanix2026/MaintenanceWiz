@@ -10,7 +10,7 @@ import config as C
 
 
 BAND_TOKENS = {
-    "CRITICAL": {"color": "#FF4D4F", "icon": "⯃", "fg": "#fff"},
+    "CRITICAL": {"color": "#FF4D4F", "icon": "⯃", "fg": "#121417"},
     "HIGH": {"color": "#FF9F1C", "icon": "▲", "fg": "#121417"},
     "MEDIUM": {"color": "#FFD60A", "icon": "◆", "fg": "#121417"},
     "LOW": {"color": "#34C759", "icon": "●", "fg": "#121417"},
@@ -21,7 +21,7 @@ assert set(BAND_TOKENS) == {b for _, b in C.PRIORITY_BANDS}, "theme tokens drift
 ANOM_TOKENS = {
     "NORMAL": {"color": "#2E3440", "icon": "⚡", "fg": "#9AA3AD"},
     "WARNING": {"color": "#FF9F1C", "icon": "⚡", "fg": "#121417"},
-    "CRITICAL": {"color": "#FF4D4F", "icon": "⚡", "fg": "#fff"},
+    "CRITICAL": {"color": "#FF4D4F", "icon": "⚡", "fg": "#121417"},
 }
 
 CONSTRAINT_COLOR = "#B388FF"
@@ -329,12 +329,18 @@ def _chip(text, bg, fg) -> str:
 
 
 def chip(band: str) -> str:
-    t = BAND_TOKENS.get(band, BAND_TOKENS["LOW"])
+    band = (band or "").upper()
+    if band not in BAND_TOKENS:
+        return _chip(f"?&nbsp;{esc(band or 'UNKNOWN')}", "#2E3440", "#9AA3AD")
+    t = BAND_TOKENS[band]
     return _chip(f"{t['icon']}&nbsp;{esc(band)}", t["color"], t["fg"])
 
 
 def anomaly_chip(status: str) -> str:
-    t = ANOM_TOKENS.get(status, ANOM_TOKENS["NORMAL"])
+    status = (status or "").upper()
+    if status not in ANOM_TOKENS:
+        return _chip(f"?&nbsp;{esc(status or 'UNKNOWN')}", "#2E3440", "#9AA3AD")
+    t = ANOM_TOKENS[status]
     return _chip(f"{t['icon']}&nbsp;{esc(status)}", t["color"], t["fg"])
 
 
@@ -353,9 +359,9 @@ def mode_badge(mode: str, fell_back: bool = False) -> str:
 def alert_level_chip(level: str) -> str:
     lv = (level or "").upper()
     if "CRITICAL" in lv:
-        return chip("CRITICAL") if lv == "CRITICAL" else _chip(f"⚡&nbsp;{esc(lv)}", BAND_TOKENS["CRITICAL"]["color"], "#fff")
-    if lv == "HIGH":
-        return chip("HIGH")
+        return chip("CRITICAL") if lv == "CRITICAL" else _chip(f"⚡&nbsp;{esc(lv)}", BAND_TOKENS["CRITICAL"]["color"], "#121417")
+    if lv in BAND_TOKENS:
+        return chip(lv)
     return _chip(esc(lv or "INFO"), "#2E3440", "#9AA3AD")
 
 
