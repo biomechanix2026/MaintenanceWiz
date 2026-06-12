@@ -327,7 +327,10 @@ def _system_prompt() -> str:
 
 def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
     """One stateless turn. Returns (rendered, updated_history)."""
-    client = genai.Client()  # reads GEMINI_API_KEY from env
+    # Strip whitespace/BOM that platform env tooling can prepend - a dirty
+    # key ends up in an HTTP header and crashes ascii encoding.
+    api_key = (os.environ.get("GEMINI_API_KEY") or "").strip().lstrip("﻿")
+    client = genai.Client(api_key=api_key or None)
     contents = [types.Content(**c) for c in history]
     contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
     config_ = types.GenerateContentConfig(
