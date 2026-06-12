@@ -1,5 +1,10 @@
-"""Vercel Python function: POST /api/chat {message, history} ->
-{text, sources, stop_reason, history}."""
+"""Vercel Python function for the hosted demo.
+
+The pyproject [tool.vercel] entrypoint routes ALL requests here (the current
+Python runtime does not serve static files alongside an entrypoint), so this
+handler serves the chat UI on GET / and the wizard API on POST /api/chat:
+{message, history} -> {text, sources, stop_reason, history}.
+"""
 import json
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -8,10 +13,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from api._core import chat_turn, rate_limited  # noqa: E402
 
+INDEX_HTML = Path(__file__).resolve().parent.parent / "index.html"
 MAX_HISTORY_MESSAGES = 60  # ~10 multi-tool turns; caps token spend
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.split("?")[0] in ("/", "/index.html"):
+            body = INDEX_HTML.read_bytes()
+            self.send_response(200)
+            self.send_header("content-type", "text/html; charset=utf-8")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self._send(404, {"error": "not found"})
+
     def do_POST(self):
         ip = self.headers.get("x-forwarded-for", "?").split(",")[0].strip()
         if rate_limited(ip):
