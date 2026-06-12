@@ -144,7 +144,60 @@ Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1 (diagno
 Demonstrates PDF objectives: 5.4 (alert reports, decision summaries),
 6.7 (real-time alerting), 7 (dashboard, role alerts).
 
-<!-- T3..T4 inserted by Tasks 4-5 -->
+## T3 · Dev, reliability engineer — "The diagnosis becomes teachable"
+
+> *The Wizard already points at the cooling-pump seal. Dev adds the field clue
+> the dataset did not have — seal weep on startup — and thirty seconds later the
+> system can cite it.*
+
+![T3 journey map](journeys/t3_map.svg)
+
+### The journey
+
+1. **Dev reads the Wizard's diagnosis for PUMP-12** — *Wizard Chat*: "cooling
+   pump status" returns Block 2 probable fault **INC-203 - Mechanical seal
+   failure (2024-12-26)**.
+2. **He adds what only the floor walk revealed** — the startup seal weep is the
+   missing context that turns a correct diagnosis into reusable plant knowledge.
+3. **He files the correction and urgency slider** — *Digital Logbook* calls
+   `record_feedback`, storing: "actual cause was the mechanical seal, not the
+   bearing" and note "seal weep recurred on startup".
+4. **He asks the same question again** — RAG re-indexes immediately. The next
+   answer can retrieve a `feedback` hit whose source is **Engineer feedback
+   PUMP-12** and whose text includes his own words.
+
+![Re-run cites the engineer](journeys/t3_feedback_cited.png)
+
+5. **The score stays honest** — Block 5 says: **1 engineer feedback record(s)
+   on this asset re-indexed as advisory context (priority score unaffected).**
+   The urgency delta is stored for calibration mode; it does not silently move
+   the live priority score.
+
+### What to notice (judges)
+
+- **Step 4:** the learning loop closes on camera: feedback becomes retrievable
+  context immediately.
+- **Step 5:** two-channel honesty — retrieval learns now, scoring changes only
+  when `MW_APPLY_FEEDBACK_BIAS` is explicitly enabled.
+- **Tacit knowledge becomes citable:** a floor observation is promoted from
+  memory to structured, asset-filtered evidence.
+
+### Demo script (2:00)
+
+| Clock | Action | Expect on screen |
+|---|---|---|
+| 0:00 | Chat: *cooling pump status* | Block 2: INC-203 - Mechanical seal failure (2024-12-26) |
+| 0:30 | Logbook tab: pick PUMP-12, type the correction, set slider +10, submit | Feedback saved |
+| 1:10 | Chat: same query again | Same risk score, now with learning line |
+| 1:30 | Point at feedback citation + Block 5 | 1 engineer feedback record(s) re-indexed; priority score unaffected |
+| 2:00 | End | — |
+
+### Traceability
+
+Demonstrates PDF objectives: 6.6 (feedback-driven improvement), 4.4 (multi-turn
+NL), 6.4 (audit trail).
+
+<!-- T4 inserted by Task 5 -->
 
 ---
 
