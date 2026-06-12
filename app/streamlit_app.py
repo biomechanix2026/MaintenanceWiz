@@ -17,7 +17,6 @@ Run:  streamlit run app/streamlit_app.py
 """
 import os
 import sys
-import json
 from datetime import datetime
 
 import pandas as pd
@@ -39,6 +38,86 @@ TH.inject()
 
 BAND_COLOR = {"CRITICAL": "#c0392b", "HIGH": "#e67e22",
               "MEDIUM": "#f1c40f", "LOW": "#27ae60"}
+
+QUICK_PROMPTS = [
+    "Why is this CRITICAL?",
+    "Show isolation steps",
+    "Parts status",
+    "What changed since yesterday?",
+]
+
+
+def role_content(turns):
+    return [{"role": t["role"], "content": t["content"]} for t in turns]
+
+
+def make_assistant_turn(res, q):
+    return {
+        "role": "assistant",
+        "content": res.answer_markdown,
+        "mode": res.mode,
+        "asset_id": res.asset_id,
+        "trace": res.trace,
+        "citations": res.citations,
+        "structured": res.structured,
+        "fell_back": bool(os.environ.get("ANTHROPIC_API_KEY")) and res.mode == "deterministic",
+        "pending_query": q if res.asset_id is None else None,
+        "alert_result": None,
+    }
+
+
+def _handle_candidate_pick(idx: int, asset_id: str):
+    if idx < 0 or idx >= len(st.session_state.get("chat", [])):
+        return
+    turn = st.session_state.chat[idx]
+    pending_query = turn.get("pending_query")
+    if not pending_query or not asset_id:
+        return
+    history = role_content(st.session_state.chat[:idx - 1])  # turns before unresolved q
+    res = run_agent(pending_query, history=history, focus_asset=asset_id)
+    st.session_state.chat[idx] = make_assistant_turn(res, pending_query)
+    if res.asset_id:
+        st.session_state.last_asset = res.asset_id
+    st.rerun()
+
+
+def _handle_dispatch(idx: int):
+    if idx < 0 or idx >= len(st.session_state.get("chat", [])):
+        return
+    turn = st.session_state.chat[idx]
+    if not turn.get("asset_id") or not isinstance(turn.get("structured"), dict):
+        turn["alert_result"] = {"dispatched": False, "status": "missing_context"}
+        st.rerun()
+        return
+    if not isinstance(turn["structured"].get("risk"), dict):
+        turn["alert_result"] = {"dispatched": False, "status": "missing_risk"}
+        st.rerun()
+        return
+    risk = turn["structured"]["risk"]
+    if not risk.get("priority_band") or risk.get("priority_score") is None:
+        turn["alert_result"] = {"dispatched": False, "status": "missing_risk"}
+        st.rerun()
+        return
+    summary = f"{turn['asset_id']} {risk['priority_band']} (score {risk['priority_score']})"
+    turn["alert_result"] = T.alert_dispatch_tool(turn["asset_id"], risk["priority_band"], summary)
+    st.rerun()
+
+
+def _quick_prompt_choice():
+    if hasattr(st, "pills"):
+        nonce = st.session_state.get("_chat_quick_prompt_nonce", 0)
+        selected = st.pills("Quick prompts", QUICK_PROMPTS, selection_mode="single",
+                            key=f"chat_quick_prompt_{nonce}", label_visibility="collapsed")
+        if selected:
+            st.session_state._chat_quick_prompt_nonce = nonce + 1
+            return selected
+        return None
+
+    cols = st.columns(len(QUICK_PROMPTS))
+    for col, prompt in zip(cols, QUICK_PROMPTS):
+        if col.button(prompt, key=f"chat_quick_{prompt}", use_container_width=True):
+            return prompt
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -399,32 +478,39 @@ if view == UI.VIEWS[2]:
     if "chat" not in st.session_state:
         st.session_state.chat = []
 
+    focus_asset = st.session_state.get("last_asset")
+    if focus_asset:
+        focus_col, clear_col = st.columns([8, 1])
+        with focus_col:
+            st.markdown(f"**In focus:** `{focus_asset}`")
+        with clear_col:
+            if st.button("✕", key="clear_chat_focus", help="Clear focus", use_container_width=True):
+                st.session_state.pop("last_asset", None)
+                st.rerun()
+
+    quick_q = _quick_prompt_choice()
     q = st.chat_input("Describe the asset, alert, or symptom...")
+    q = q or quick_q
     q = q or st.session_state.pop("chat_prefill", None)
 
-    for turn in st.session_state.chat:
-        with st.chat_message(turn["role"]):
-            st.markdown(turn["content"], unsafe_allow_html=True)
+    for idx, turn in enumerate(st.session_state.chat):
+        role = turn.get("role", "assistant")
+        with st.chat_message(role):
+            if role == "assistant":
+                UI.render_assistant_turn(turn, idx, on_pick=_handle_candidate_pick, on_dispatch=_handle_dispatch)
+            else:
+                st.markdown(turn.get("content", ""))
 
     if q:
         st.session_state.chat.append({"role": "user", "content": q})
-        with st.chat_message("user"):
-            st.markdown(q)
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking -> acting -> observing..."):
-                # Pass prior turns + the asset in focus so follow-ups
-                # ("what about its bearings?") stay context-aware.
-                history = st.session_state.chat[:-1]
-                res = run_agent(q, history=history,
-                                focus_asset=st.session_state.get("last_asset"))
-            st.markdown(res.answer_markdown)
-            with st.expander(f"🧠 Tool trace ({len(res.trace)} calls · mode={res.mode})"):
-                for step in res.trace:
-                    st.markdown(f"**{step['tool']}** `{json.dumps(step['input'])}`")
-                    st.json(step["output"], expanded=False)
-            if res.asset_id:
-                st.session_state.last_asset = res.asset_id
-        st.session_state.chat.append({"role": "assistant", "content": res.answer_markdown})
+        with st.spinner("Thinking -> acting -> observing..."):
+            history = role_content(st.session_state.chat[:-1])
+            res = run_agent(q, history=history,
+                            focus_asset=st.session_state.get("last_asset"))
+        st.session_state.chat.append(make_assistant_turn(res, q))
+        if res.asset_id:
+            st.session_state.last_asset = res.asset_id
+        st.rerun()
 
 
 # ==========================================================================
