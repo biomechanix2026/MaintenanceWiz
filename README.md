@@ -14,6 +14,15 @@ every compliance step is logged.
 > 🧭 **Start here for the demo:** [User journeys & demo script](docs/UX_JOURNEYS.md) —
 > how four plant roles use the Wizard, with timed, click-by-click walkthroughs.
 
+## Hosted demo
+
+Live demo (slim serverless build, Gemini 2.5 Flash free tier):
+**https://maintenancewiz.vercel.app** — see `web/`. It exposes 10 of the
+12 tools over a precomputed prognostics snapshot, BM25 retrieval and
+bundled read-only SQLite, all exported from the real implementation by
+`scripts/build_demo_assets.py`. The full build (Claude tool-use loop +
+deterministic fallback) runs locally per the instructions below.
+
 ---
 
 ## The idea in one line
