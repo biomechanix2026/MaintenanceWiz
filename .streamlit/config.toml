@@ -1,0 +1,10 @@
+[theme]
+base = "dark"
+primaryColor = "#FF9F1C"             # molten-steel amber accent
+backgroundColor = "#121417"          # spec §3.2 near-black
+secondaryBackgroundColor = "#1C1F24" # spec §3.2 panel
+textColor = "#E8EAED"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
