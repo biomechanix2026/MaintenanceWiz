@@ -10,7 +10,7 @@ Agentic AI
 https://maintenancewiz.vercel.app
 
 ## Repository URL
-https://github.com/<user>/MaintenanceWiz  <!-- fill in after publish (Task 8) -->
+https://github.com/biomechanix2026/MaintenanceWiz
 
 ## Description
 Unplanned downtime in heavy industry costs millions per day, while the
