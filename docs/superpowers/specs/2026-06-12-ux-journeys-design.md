@@ -146,7 +146,16 @@ Slide candidates, in pitch order: T1's constraint-flip moment (`t1_map.svg` +
 as the vision slide, `cast.svg` as the personas slide. Slide edits in
 `docs/deck/build_deck.js` are a separate task after the journeys land.
 
-## 11. Out of scope (YAGNI)
+## 11. Hard constraint: the frontend is hands-off
+
+A significant frontend upgrade is in flight on this branch (status strip, nav
+shell, triage cards, wallboard, chat cards). **This project must not create,
+modify, or delete any file under `app/`.** The deliverable is documentation +
+assets only (`docs/UX_JOURNEYS.md`, `docs/journeys/`, a README link). The
+verification walk *runs* the app read-only; if a demo script doesn't match the
+live UI, the script is corrected — never the app.
+
+## 12. Out of scope (YAGNI)
 
 - Deck slide implementation (hooks only).
 - Building any Part-2 feature — F-journeys are planning instruments.
