@@ -1,0 +1,175 @@
+[
+  {
+    "name": "resolve_asset",
+    "description": "Map free-text/jargon to a formal asset_id.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "prognostic_tool",
+    "description": "RUL, failure probability and SHAP attribution for an asset.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ]
+    }
+  },
+  {
+    "name": "abnormality_tool",
+    "description": "Independent dynamic abnormality detection from sensor deviations and trend.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ]
+    }
+  },
+  {
+    "name": "rag_tool",
+    "description": "Retrieve SOP/manual/incident text, optionally filtered to an asset_id.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "asset_id": {
+          "type": "string"
+        },
+        "k": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "inventory_tool",
+    "description": "Spare-part stock and procurement lead times for an asset.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ]
+    }
+  },
+  {
+    "name": "sql_query_tool",
+    "description": "Run a read-only SELECT over tables: assets, sensors, delays, incidents, parts. Returns the SQL and rows.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    }
+  },
+  {
+    "name": "delay_history_tool",
+    "description": "Production delay history for an asset.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ]
+    }
+  },
+  {
+    "name": "risk_score_tool",
+    "description": "Deterministic priority score and constraint flag for an asset.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ]
+    }
+  },
+  {
+    "name": "alert_dispatch_tool",
+    "description": "Dispatch a real-time, role-routed alert for a high-risk asset. Omit recipients to auto-route by severity (critical->supervisor, high->reliability, else maintenance); or pass role (maintenance|reliability|supervisor) or an explicit recipients string.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "asset_id": {
+          "type": "string"
+        },
+        "risk_level": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "recipients": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "risk_level",
+        "summary"
+      ]
+    }
+  },
+  {
+    "name": "task_closure_tool",
+    "description": "Check the compliance checklist for a work order; blocks closure if items missing.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "work_order_id": {
+          "type": "string"
+        },
+        "checklist": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "work_order_id"
+      ]
+    }
+  }
+]
