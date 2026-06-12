@@ -24,8 +24,7 @@ Part 2 only, not built.
 
 ## T1 · Arjun, field technician — "The part that can't arrive in time"
 
-> *At shift start the mill drive gearbox is trending toward failure — and the
-> replacement pinion is 45 days away.*
+> *At shift start the mill drive gearbox is trending toward failure — and the replacement pinion is 45 days away.*
 
 ![T1 journey map](journeys/t1_map.svg)
 
@@ -41,7 +40,8 @@ Part 2 only, not built.
 ![Five-block answer with constraint chip](journeys/t1_fiveblock_constraint.png)
 
 3. **He opens "how I got this"** — the trace expander lists all 8 tool
-   calls with inputs and outputs, including the exact SQL the agent ran.
+   calls with inputs and outputs, including the exact SQL:
+   `SELECT delay_code, COUNT(*) AS n, SUM(downtime_min) AS mins FROM delays WHERE asset_id='GEARBOX-05' GROUP BY delay_code ORDER BY mins DESC`.
 
 ![The tool trace](journeys/t1_trace.png)
 
@@ -53,7 +53,7 @@ Part 2 only, not built.
    cited by name. Torque values and steps come only from tool outputs — never
    from model memory.
 6. **He closes the work order** — *Digital Logbook*: the closure button stays
-   disabled until the compliance checklist (parts recorded, steps logged,
+   disabled until the 5/5 compliance checklist (parts recorded, steps logged,
    isolation cleared, follow-up scheduled, logbook entry) is green.
 
 ### What to notice (judges)
@@ -72,7 +72,7 @@ Part 2 only, not built.
 |---|---|---|
 | 0:00 | Open the app; point at the engine-mode badge | "Deterministic (offline)" or "LLM" |
 | 0:10 | Chat tab → type *what's wrong with the mill gearbox?* | Five block-cards render |
-| 0:30 | Read Block 1 aloud | CRITICAL · 82.0/100 · RUL 36.1d |
+| 0:30 | Read Blocks 1-2 aloud | CRITICAL · 82.0/100 · RUL 36.1d · 32% failure probability; top driver vibration |
 | 0:50 | Expand the tool trace | 8 calls; SQL in a code block |
 | 1:10 | Point at Block 4 part rows | PINION-G5 OUT, 45d lead |
 | 1:25 | Read the flip line in Block 3 | "monitored degradation" |
@@ -81,9 +81,7 @@ Part 2 only, not built.
 
 ### Traceability
 
-Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1
-(diagnosis, root cause, RUL), 5.2 (constraint-based priority), 5.3 (step-by-step
-actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
+Demonstrates PDF objectives: 4.3 (manuals/spares), 4.4 (NL queries), 5.1 (diagnosis, root cause, RUL), 5.2 (constraint-based priority), 5.3 (step-by-step actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 
 ## T2 · Meera, shift supervisor — "The shift that starts itself"
 
