@@ -197,7 +197,59 @@ Demonstrates PDF objectives: 5.4 (alert reports, decision summaries),
 Demonstrates PDF objectives: 6.6 (feedback-driven improvement), 4.4 (multi-turn
 NL), 6.4 (audit trail).
 
-<!-- T4 inserted by Task 5 -->
+## T4 · Shalini, maintenance manager — "Where is tomorrow's downtime coming from?"
+
+> *Standup is in five minutes and the only honest answer to "what's our biggest
+> risk?" has to survive being clicked on.*
+
+![T4 journey map](journeys/t4_map.svg)
+
+### The journey
+
+1. **Shalini opens the Plant Bottleneck board** — *Bottleneck board*: the same
+   deterministic scan ranks **12 assets** by priority score, with **1 critical**
+   and **1 constraint-flagged**.
+2. **The top card is already the conversation** — **GEARBOX-05** sits at the
+   top with the ⛔ constraint chip. The band comes from `config.py` thresholds,
+   not UI copy.
+
+![Bottleneck board](journeys/t4_board.png)
+
+3. **She clicks one number she doesn't believe** — *Asset Deep-Dive*: the
+   evidence room shows sensor deviations in σ, SHAP drivers, parts status, and
+   the SQL used to summarize downtime.
+4. **🔜 What does it idle downstream?** — `cascade_tool` adds system priority
+   and topology impact, linking an asset risk to the line it can idle.
+5. **🔜 What if we defer 48h? + KPI row for the standup** — `scenario_tool` and
+   `kpi_summary` turn the decision into a management row instead of a debate.
+
+*🔜 = approved tranche, plan committed
+(`docs/superpowers/plans/2026-06-12-cascade-scenario-kpi.md`), not yet merged.
+Delete these tags when it lands.*
+
+### What to notice (judges)
+
+- **AI to build, UI to validate:** the management story is not a chat answer;
+  it is a ranked board whose numbers survive interrogation.
+- **Same deterministic brain:** the board ranking comes from the same
+  `risk_score_tool` contract the eval judges exercise.
+- **Planned, not vapor:** the in-flight steps point to a committed implementation plan
+  for cascade, scenario, and KPI work.
+
+### Demo script (1:30)
+
+| Clock | Action | Expect on screen |
+|---|---|---|
+| 0:00 | Bottleneck tab, read the counts row | 12 assets · 1 critical · 1 constraint-flagged |
+| 0:20 | Point at the GEARBOX-05 card + ⛔ chip | GEARBOX-05 is top-ranked |
+| 0:40 | Deep-Dive: sensor σ-deviations, SHAP bars, parts table | Evidence room explains the score |
+| 1:10 | Mention the cascade/KPI tranche in one sentence | Planned cascade/scenario/KPI plan in repo |
+| 1:30 | End | — |
+
+### Traceability
+
+Demonstrates PDF objectives: 5.2 (risk bands, plant bottleneck), 6.4
+(traceability), 7 (dashboard).
 
 ---
 
