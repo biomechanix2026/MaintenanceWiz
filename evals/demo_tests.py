@@ -84,8 +84,94 @@ def test_validate_snapshot_requires_constraint_demo():
 
 
 # ---------------------------------------------------------------------------
-# Serverless core (web/api/_core.py) — tests added in Task 3 below this line
+# Serverless core (web/api/_core.py)
 # ---------------------------------------------------------------------------
+import importlib.util
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _core():
+    spec = importlib.util.spec_from_file_location(
+        "demo_core", _ROOT / "web" / "api" / "_core.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_CHUNKS = [
+    {"id": "c1", "asset_id": "GEARBOX-05",
+     "source": "Manual GEARBOX-05 - Troubleshooting", "type": "manual",
+     "text": "bearing vibration high on gearbox pinion"},
+    {"id": "c2", "asset_id": "PUMP-12",
+     "source": "Manual PUMP-12 - Troubleshooting", "type": "manual",
+     "text": "bearing vibration inspection procedure for pump"},
+]
+
+
+def test_core_rag_filters_by_asset():
+    dc = _core()
+    dc._cache["chunks"] = _CHUNKS
+    dc._cache.pop("bm25", None)
+    out = dc.rag_tool("bearing vibration", asset_id="PUMP-12")
+    assert [h["source"] for h in out["results"]] == [_CHUNKS[1]["source"]]
+    assert out["backend"].startswith("bm25")
+
+
+def test_core_snapshot_tools_and_unknown_asset():
+    dc = _core()
+    dc._cache["snapshot"] = {"assets": {"GEARBOX-05": {
+        "prognostic": {"rul_days": 12.0}, "abnormality": {"status": "CRITICAL"},
+        "risk": {"priority_score": 85.0, "constraint_flag": "LEAD TIME"}}}}
+    assert dc.prognostic_tool("GEARBOX-05")["rul_days"] == 12.0
+    assert "error" in dc.prognostic_tool("NO-SUCH-99")
+
+
+def test_core_dispatch_search_returns_sources():
+    dc = _core()
+    dc._cache["chunks"] = _CHUNKS
+    dc._cache.pop("bm25", None)
+    result, sources = dc.dispatch("rag_tool", {"query": "bearing vibration"})
+    assert result["results"] and sources
+    assert sources[0]["source"].startswith("Manual ")
+
+
+def test_core_dispatch_unknown_tool():
+    dc = _core()
+    result, sources = dc.dispatch("no_such_tool", {})
+    assert "error" in result and sources is None
+
+
+def test_core_alert_is_always_dry_run():
+    dc = _core()
+    out, _ = dc.dispatch("alert_dispatch_tool", {
+        "asset_id": "GEARBOX-05", "risk_level": "CRITICAL", "summary": "x"})
+    assert out["dry_run"] is True and out["dispatched"] is False
+    assert out["recipients"] == "shift-supervisor@plant.local"
+
+
+def test_core_sql_guard_rejects_writes():
+    dc = _core()
+    out, _ = dc.dispatch("sql_query_tool", {"sql": "DELETE FROM parts"})
+    assert "error" in out
+
+
+def test_core_task_closure_pure():
+    dc = _core()
+    out, _ = dc.dispatch("task_closure_tool", {"work_order_id": "WO-1"})
+    assert out["can_close"] is False and out["completion_blocked_by"]
+
+
+def test_core_rate_limiter():
+    dc = _core()
+    dc._hits.clear()
+    now = 1000.0
+    for _ in range(dc.RATE_LIMIT):
+        assert dc.rate_limited("1.2.3.4", now=now) is False
+    assert dc.rate_limited("1.2.3.4", now=now) is True
+    assert dc.rate_limited("5.6.7.8", now=now) is False
+    assert dc.rate_limited("1.2.3.4", now=now + dc.RATE_WINDOW + 1) is False
 
 
 def main():
