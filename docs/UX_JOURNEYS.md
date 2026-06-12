@@ -98,7 +98,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
    12 assets with the same deterministic tools the chat uses and writes the
    shift briefing to `reports/`. This morning: **5 assets need
    attention** (1 critical).
-2. **Alerts are already routed** — all five of this morning's findings crossed the critical threshold, so every alert went to `shift-supervisor@plant.local`. Routing follows the config role map (critical → supervisor, high → reliability, else maintenance). Re-running the scan does not re-spam: same asset+band+day is not logged twice.
+2. **Alerts are already routed** — all five of this morning's findings carried **anomaly-critical** early warnings from the independent sensor detector, so every alert escalated to `shift-supervisor@plant.local`. Routing follows the config role map (critical → supervisor, high → reliability, else maintenance). Re-running the scan does not re-spam: same asset+band+day is not logged twice.
 3. **Meera reads the briefing** — counts by band, urgent assets in score
    order, and a drafted work order for each — including long-lead parts to
    order now.
@@ -106,7 +106,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 ![Pre-shift briefing](journeys/t2_preshift.png)
 
 4. **She glances across the control room** — the wallboard
-   (`?wallboard=1`) shows the top risk cards in wallboard type, auto-refreshing.
+   (`?wallboard=1`) shows the top risk cards in wallboard mode, auto-refreshing.
    Severity is readable from meters away: color + icon + label, never color alone.
 
 ![Wallboard](journeys/t2_wallboard.png)
@@ -131,7 +131,7 @@ actions, procurement strategy), 5.4 (digital log), 6.4 (explainability).
 | 0:20 | Open the newest `reports/preshift_*.md` | Counts: 5 need attention, 1 critical |
 | 0:45 | Point at the alert routing line | shift-supervisor@plant.local |
 | 1:00 | Re-run the same command | Dedup: no duplicate alerts |
-| 1:10 | Browser: `http://localhost:8501/?wallboard=1` | Top cards, wallboard type |
+| 1:10 | Browser: `http://localhost:8501/?wallboard=1` (app must be running: `streamlit run app/streamlit_app.py`) | Top cards, wallboard mode |
 | 1:30 | End | — |
 
 #### Traceability
