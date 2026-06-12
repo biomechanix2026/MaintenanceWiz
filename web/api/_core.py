@@ -26,7 +26,7 @@ from contextlib import closing
 from pathlib import Path
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -38,6 +38,7 @@ def _env(name: str, default: str = "") -> str:
 
 
 MODEL = _env("WIZARD_MODEL", "gemini-2.5-flash")
+FALLBACK_MODEL = _env("WIZARD_FALLBACK_MODEL", "gemini-2.5-flash-lite")
 MAX_TOKENS = int(_env("WIZARD_MAX_TOKENS", "4000"))
 MAX_TOOL_ROUNDS = 10
 RATE_LIMIT = 20      # requests per IP ...
@@ -349,9 +350,24 @@ def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
     sources: list[dict] = []
     rendered = {"text": "(stopped: tool-round limit reached)",
                 "sources": [], "stop_reason": "tool_round_limit"}
+    model = MODEL
     for _ in range(MAX_TOOL_ROUNDS):
-        response = client.models.generate_content(
-            model=MODEL, contents=contents, config=config_)
+        # Free-tier flash returns 503 under load spikes: retry once, then
+        # degrade to the lite model for the remainder of this turn.
+        try:
+            response = client.models.generate_content(
+                model=model, contents=contents, config=config_)
+        except errors.ServerError:
+            time.sleep(2)
+            try:
+                response = client.models.generate_content(
+                    model=model, contents=contents, config=config_)
+            except errors.ServerError:
+                if model == FALLBACK_MODEL:
+                    raise
+                model = FALLBACK_MODEL
+                response = client.models.generate_content(
+                    model=model, contents=contents, config=config_)
         candidate = response.candidates[0]
         contents.append(candidate.content)
         calls = [p.function_call for p in (candidate.content.parts or [])
@@ -360,7 +376,8 @@ def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
             text = "".join(p.text for p in (candidate.content.parts or [])
                            if p.text)
             rendered = {"text": text, "sources": sources,
-                        "stop_reason": str(candidate.finish_reason)}
+                        "stop_reason": str(candidate.finish_reason),
+                        "model": model}
             break
         parts = []
         for fc in calls:
