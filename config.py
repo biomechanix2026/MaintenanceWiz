@@ -124,6 +124,31 @@ CASCADE_DECAY = 0.6    # per-hop attenuation of downstream weight
 CASCADE_GAIN = 3.0     # blast-radius units -> system_priority points
 
 # --------------------------------------------------------------------------
+# Financial cost engine + risk simulator (DEMO ECONOMICS - not plant-sourced).
+# Centralized here so the cost/sim layers never inline a money figure; every
+# constant is an explicitly-labelled demo assumption, easy to replace with a
+# plant finance table later.
+# --------------------------------------------------------------------------
+DOWNTIME_COST_USD_PER_HOUR = {     # $/hr of lost production by asset type
+    "furnace": 120000, "conveyor": 18000, "pump": 22000, "valve": 16000,
+    "mill": 90000, "gearbox": 65000, "compressor": 30000, "crane": 25000,
+}
+TONNAGE_MARGIN_USD_PER_TON = 75    # $/ton of lost/scrapped product margin
+PLANNED_STOP_COST_FACTOR = 0.35    # planned stop costs this fraction of unplanned downtime $/hr
+DEFAULT_EVENT_DOWNTIME_MIN_BY_TYPE = {   # fallback when an asset has no delay history
+    "furnace": 90, "conveyor": 45, "pump": 40, "valve": 35,
+    "mill": 120, "gearbox": 75, "compressor": 50, "crane": 30,
+}
+DEFAULT_EVENT_TONNAGE_LOST_BY_TYPE = {
+    "furnace": 60, "conveyor": 20, "pump": 15, "valve": 10,
+    "mill": 80, "gearbox": 40, "compressor": 12, "crane": 8,
+}
+SIMULATION_TRIALS = 1000           # Monte-Carlo trials; target < 1s
+SIMULATION_SEED = 42               # common-random-numbers base seed -> reproducible
+CASCADE_EDGE_PROBABILITY_FLOOR = 0.05
+CASCADE_EDGE_PROBABILITY_CAP = 0.85
+
+# --------------------------------------------------------------------------
 # Next-shift planner (crew-hour + spares constrained allocation)
 # --------------------------------------------------------------------------
 CREW_ROSTER_CSV = os.path.join(DATA_DIR, "crew_roster.csv")

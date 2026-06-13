@@ -46,9 +46,10 @@ Be concise and scannable. Never fabricate; if data is missing, say so.
 This is the slim hosted build. Differences from the full local build:
 - prognostic_tool, abnormality_tool and risk_score_tool return a snapshot
   computed from the latest sensor readings at export time.
-- fault_mode_tool, feedback_tool, cascade_tool and shift_plan_tool exist only
-  in the full local build; never reference or promise them. (The cascade
-  pipeline step is stripped from this prompt, so you will not see it.)
+- fault_mode_tool, feedback_tool, cascade_tool, shift_plan_tool, cost_tool and
+  risk_simulator_tool exist only in the full local build; never reference or
+  promise them. (The cascade and financial pipeline steps are stripped from this
+  prompt, so you will not see them.)
 - alert_dispatch_tool always runs dry-run here: report the routed alert and
   say live dispatch is disabled in the hosted demo.
 - Retrieval is keyword (BM25) only. Name the source document/section for
