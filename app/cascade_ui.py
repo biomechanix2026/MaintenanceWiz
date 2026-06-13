@@ -48,11 +48,18 @@ def build_topology_dot(rows: list[dict], graph: dict[str, list[str]]) -> str:
         row = by_asset.get(aid, {})
         name = row.get("name") or aid
         sysp = _num(row.get("system_priority", row.get("priority_score", 0.0)))
-        label = f"{aid}\\n{str(name)[:24]}\\nsys {sysp:.1f}"
+        # Escape each label line, THEN join with the DOT newline (\n). Joining
+        # first and re-escaping would double the backslash, so Graphviz would
+        # render a literal "\n" and balloon the SVG width.
+        label = "\\n".join((
+            _dot_escape(aid),
+            _dot_escape(str(name)[:24]),
+            f"sys {sysp:.1f}",
+        ))
         color = _band_color(row.get("band") or row.get("priority_band"))
         font = "#121417" if color not in {"#2E3440", "#242932"} else "#E8EAED"
         lines.append(
-            f'  "{_dot_escape(aid)}" [label="{_dot_escape(label)}", '
+            f'  "{_dot_escape(aid)}" [label="{label}", '
             f'fillcolor="{color}", fontcolor="{font}"];'
         )
 

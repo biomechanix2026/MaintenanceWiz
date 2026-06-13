@@ -27,6 +27,10 @@ def test_UI1_topology_dot_contains_system_priority_and_edges():
     assert "ROLL-MILL-04" in dot and "sys 82.0" in dot, dot
     assert '"GEARBOX-05" -> "ROLL-MILL-04"' in dot, dot
     assert "#FF4D4F" in dot and "#FF9F1C" in dot, dot
+    # labels must use the DOT newline (\n), not a double-escaped \\n that
+    # Graphviz renders literally and which balloons the SVG width.
+    assert "\\n" in dot, "label newline missing"
+    assert "\\\\n" not in dot, "label newline double-escaped (renders literal \\n)"
 
 
 @suite.case
