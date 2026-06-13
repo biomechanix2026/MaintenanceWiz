@@ -202,6 +202,7 @@ def run_deterministic(query: str, focus_asset: str | None = None,
     delays = _dispatch("delay_history_tool", {"asset_id": aid}, trace)
     risk = _dispatch("risk_score_tool", {"asset_id": aid}, trace)
     casc = _dispatch("cascade_tool", {"asset_id": aid}, trace)
+    cost = _dispatch("cost_tool", {"asset_id": aid}, trace)
     sql = _dispatch("sql_query_tool",
                     {"sql": f"SELECT delay_code, COUNT(*) AS n, SUM(downtime_min) AS mins "
                             f"FROM delays WHERE asset_id='{aid}' GROUP BY delay_code ORDER BY mins DESC"},
@@ -230,15 +231,15 @@ def run_deterministic(query: str, focus_asset: str | None = None,
 
     res.structured = {"asset_id": aid, "risk": risk, "cascade": casc, "prognostic": prog,
                       "abnormality": abnormality,
-                      "inventory": inv, "delays": delays,
+                      "inventory": inv, "delays": delays, "cost": cost,
                       "alert_recommended": alert_recommended}
     res.answer_markdown = _render(query, aid, prog, shap, top, abnormality, risk, delays,
-                                  inv, sops, incidents, probable, sql, alert_line, casc)
+                                  inv, sops, incidents, probable, sql, alert_line, casc, cost)
     return res
 
 
 def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, incidents,
-            probable, sql, alert_line, casc):
+            probable, sql, alert_line, casc, cost=None):
     devs = shap.get("deviations", {})
     drivers = ", ".join(f"{f} ({devs.get(f,0):+.1f}σ)" for f in shap.get("ranked_drivers", [])[:3])
     out_parts = [p for p in inv["parts"] if p["qty_on_hand"] == 0]
@@ -292,6 +293,27 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
         system_line = "\n- **System impact:** terminal asset - no downstream dependents"
         casc_md = ""
 
+    # Financial exposure (Block 1) + value preserved / at risk (Block 4). Additive,
+    # tool-grounded; dollars come only from cost_tool (never invented). repair_now is
+    # the only action that preserves value this shift; others are exposed value at risk.
+    cost_line1 = cost_line4 = ""
+    if cost and "error" not in cost:
+        ec = cost["event_cost_proxy"]
+        cost_line1 = (f"\n- **Estimated exposure:** ~${cost['failure_cost_usd']:,.0f} expected "
+                      f"event-cost proxy (cascade-coupled); single-event proxy "
+                      f"~${ec['total_usd']:,.0f}")
+        v = cost["emv"]
+        f_ = cost["feasibility"]
+        if f_["action"] == "repair_now":
+            cost_line4 = (f"\n- **Estimated value preserved by repair_now:** "
+                          f"~${v['expected_value_preserved_usd']:,.0f} (expected run-to-failure "
+                          f"loss ~${v['expected_failure_loss_usd']:,.0f}); counterfactual "
+                          f"estimate under stated assumptions.")
+        else:
+            cost_line4 = (f"\n- **Estimated value at risk pending {f_['action']}:** "
+                          f"~${v['expected_failure_loss_usd']:,.0f}; exposed risk, not value "
+                          f"preserved this shift.")
+
     fb_n = risk.get("feedback_count", 0)
     fb_md = (f"\n- **Continuous learning:** {fb_n} engineer feedback record(s) on this "
              f"asset re-indexed as advisory context"
@@ -303,7 +325,7 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
 - **Asset:** `{aid}`  |  **Priority:** **{risk['priority_band']}** (score **{risk['priority_score']}/100**)
 - **Remaining Useful Life:** **{prog['rul_days']} days**  |  30-day failure probability: **{prog['failure_probability_30d']:.0%}**
 - **Independent abnormality detector:** **{abn_status}** (score **{abn_score}/100**; catastrophic risk: **{catastrophic}**)
-- **Delay severity:** {delays['events']} events, {delays['total_downtime_min']} min downtime, {delays['tonnage_lost']:.0f} t lost{alert_line}{system_line}
+- **Delay severity:** {delays['events']} events, {delays['total_downtime_min']} min downtime, {delays['tonnage_lost']:.0f} t lost{alert_line}{system_line}{cost_line1}
 
 ### 2. Diagnostic & Root-Cause Breakdown
 - **Probable fault:** {probable}
@@ -320,7 +342,7 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
 
 ### 4. Supply-Chain Logistics Strategy
 {parts_md}
-- **Mitigation:** {"Out-of-stock long-lead parts present - " + ", ".join(p['part_no'] for p in out_parts) + ". Expedite procurement or apply interim monitoring." if out_parts else "All required parts are in stock; no procurement risk."}
+- **Mitigation:** {"Out-of-stock long-lead parts present - " + ", ".join(p['part_no'] for p in out_parts) + ". Expedite procurement or apply interim monitoring." if out_parts else "All required parts are in stock; no procurement risk."}{cost_line4}
 
 ### 5. Traceability & Audit Trail
 - **SOP sources:**
@@ -350,6 +372,10 @@ def _structured_from_trace(trace: list, asset_id: str | None) -> dict:
            "abnormality": last("abnormality_tool"),
            "inventory": last("inventory_tool"),
            "delays": last("delay_history_tool")}
+    cost = next((t["output"] for t in reversed(trace)
+                 if t["tool"] == "cost_tool" and "error" not in (t.get("output") or {})), None)
+    if cost is not None:
+        out["cost"] = cost
     if risk.get("priority_score") is not None:
         out["alert_recommended"] = risk["priority_score"] >= ALERT_THRESHOLD
     return {k: v for k, v in out.items() if v is not None}

@@ -248,5 +248,38 @@ def test_T4_risk_simulator_tool_buckets_and_distribution():
     assert procure_seen, "expected at least one procure_for_window candidate in demo data"
 
 
+# ---- T5: five-block render carries dollars; structured parity --------------
+@suite.case
+def test_T5_five_blocks_present_and_dollars_in_1_and_4():
+    from agent.orchestrator import run_deterministic
+    res = run_deterministic("Status of GEARBOX-05?")
+    text = res.answer_markdown
+    for h in ("### 1.", "### 2.", "### 3.", "### 4.", "### 5."):
+        assert h in text, f"missing block header {h}"
+    block1 = text.split("### 2.")[0]
+    block4 = text.split("### 4.")[1].split("### 5.")[0]
+    assert "$" in block1, "Block 1 must carry the expected event-cost proxy in $"
+    assert "$" in block4, "Block 4 must carry estimated financial exposure/value in $"
+
+
+@suite.case
+def test_T5_structured_has_cost_fields():
+    from agent.orchestrator import run_deterministic
+    res = run_deterministic("Status of GEARBOX-05?")
+    assert "cost" in res.structured, res.structured.keys()
+    assert "emv" in res.structured["cost"], res.structured["cost"]
+
+
+@suite.case
+def test_T5_structured_from_trace_parity():
+    from agent.orchestrator import _structured_from_trace
+    trace = [{"tool": "cost_tool", "input": {"asset_id": "GEARBOX-05"},
+              "output": {"asset_id": "GEARBOX-05",
+                         "emv": {"expected_value_preserved_usd": 123.0},
+                         "event_cost_proxy": {"total_usd": 999.0}}}]
+    s = _structured_from_trace(trace, "GEARBOX-05")
+    assert s.get("cost", {}).get("emv", {}).get("expected_value_preserved_usd") == 123.0, s
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))
