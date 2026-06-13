@@ -1,0 +1,9 @@
+asset_type,task,est_hours,required_skill
+furnace,Electrode clamp service,4.0,electrical
+conveyor,Drive bearing inspection/replace,3.0,mechanical
+pump,Mechanical seal service,3.5,mechanical
+valve,Proportional valve spool service,2.5,hydraulic
+mill,Work roll change,5.0,mechanical
+gearbox,Pinion inspection/replace,4.0,mechanical
+compressor,Compressor service,3.0,mechanical
+crane,Crane electrical inspection,2.0,electrical

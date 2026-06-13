@@ -33,6 +33,11 @@ def test_OUT08_plant_bottleneck_ranking():
     assert scores == sorted(scores, reverse=True), "not sorted by descending priority"
     assert any(x["constraint"] for x in rows), "no constraint indicator anywhere"
     assert all(x["anomaly"] in {"NORMAL", "WARNING", "CRITICAL"} for x in rows), "missing anomaly indicator"
+    # genuine plant-level behaviour: an upstream bottleneck escalates above its
+    # isolated priority via the cascade graph (not just per-asset ranking).
+    casc = T.cascade_tool("GEARBOX-05")
+    assert casc["downstream_count"] > 0, "upstream asset should idle downstream equipment"
+    assert casc["system_priority"] >= casc["own_priority"], "system priority must escalate, not shrink"
 
 
 # ---- OUT-15 / EO-01 / EO-02: pre-shift autonomous report ------------------
@@ -53,6 +58,9 @@ def test_OUT15_preshift_report():
         assert "RUL" in md and "abnormality" in md.lower(), "missing RUL/abnormality detail"
         assert "Drafted WO" in md, "no drafted work order"
         assert "GEARBOX-05" in md, "EO-01: known high-risk asset absent from pre-shift queue"
+        # next-shift planner: the briefing ends with an allocated plan, not just a list
+        assert "Next shift plan" in md, "no next-shift plan section"
+        assert ("Deferred" in md or "Procurement" in md), "plan has no deferral/procurement reasons"
 
 
 # ---- EO-05: out-of-stock long-lead parts surfaced + alter plan ------------

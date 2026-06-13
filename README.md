@@ -18,7 +18,7 @@ every compliance step is logged.
 
 Live demo (slim serverless build, Gemini 2.5 Flash free tier):
 **https://maintenancewiz.vercel.app** — see `web/`. It exposes 10 of the
-12 tools over a precomputed prognostics snapshot, BM25 retrieval and
+14 tools over a precomputed prognostics snapshot, BM25 retrieval and
 bundled read-only SQLite, all exported from the real implementation by
 `scripts/build_demo_assets.py`. The full build (Claude tool-use loop +
 deterministic fallback) runs locally per the instructions below.
@@ -169,7 +169,7 @@ knowledge/
   rag.py                  asset-filtered hybrid RAG (ChromaDB/TF-IDF + BM25)
 agent/
   system_prompt.py        the Consolidated-Brain system prompt
-  tools.py                the 12-tool suite (structured outputs)
+  tools.py                the 14-tool suite (structured outputs)
   orchestrator.py         think→act→observe loop (LLM + deterministic)
 app/streamlit_app.py      5-panel dashboard
 scripts/pre_shift_run.py  autonomous pre-shift briefing (cron-friendly)
@@ -231,8 +231,9 @@ evals/judges.py           observability-driven eval judges
 - **LLM mode requires `ANTHROPIC_API_KEY`** and network access; without it the
   system runs the deterministic pipeline, which is the reproducible baseline but
   not identical prose.
-- **The plant cascade / bottleneck graph is designed but not implemented**
-  (see `docs/superpowers/specs/`); plant-level reasoning today is per-asset
-  ranking plus the pre-shift action queue.
+- **Plant cascade reasoning is additive.** `cascade_tool` computes blast radius
+  and `system_priority` on top of (never inside) the eval-judged
+  `priority_score`; the topology spec lives in `config.py`
+  (design: `docs/superpowers/specs/2026-06-08-plant-cascade-graph-design.md`).
 - **Not safety-certified.** Outputs are decision *support*; every recommendation
   must be validated by a qualified engineer against the cited SOPs.

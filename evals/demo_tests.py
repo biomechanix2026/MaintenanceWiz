@@ -34,13 +34,25 @@ def test_demo_tools_subset_and_gemini_format():
     from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
     tools = demo_tools()
     names = {t["name"] for t in tools}
-    assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool"}
+    assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool",
+                              "cascade_tool", "shift_plan_tool"}
     assert names.isdisjoint(EXCLUDED_TOOLS)
-    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 12
+    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 14
     assert names <= set(TOOL_FUNCS)            # every exported tool is real
     for t in tools:                            # Gemini format, not Anthropic
         assert "parameters" in t and "input_schema" not in t
         assert t["parameters"]["type"] == "object"
+
+
+def test_hosted_prompt_strips_local_only_steps():
+    # The exported prompt must not order the hosted model toward an excluded
+    # tool: the STEP 4.5 PLANT IMPACT block (call cascade_tool) is stripped.
+    from scripts.build_demo_assets import hosted_system_prompt
+    hp = hosted_system_prompt()
+    assert "STEP 4.5" not in hp, "STEP 4.5 block not stripped from hosted prompt"
+    assert "call cascade_tool" not in hp, "hosted prompt still orders cascade_tool"
+    assert "STEP 5" in hp, "strip over-ran into STEP 5"
+    assert "Hosted-demo deployment note" in hp, "DEMO_NOTE missing from hosted prompt"
 
 
 def test_validate_snapshot_accepts_good():

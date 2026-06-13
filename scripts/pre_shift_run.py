@@ -20,7 +20,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
 from agent.tools import (risk_score_tool, prognostic_tool, abnormality_tool,
-                         inventory_tool, alert_dispatch_tool)
+                         inventory_tool, alert_dispatch_tool, shift_plan_tool)
 from config import ALERT_THRESHOLD
 
 REPORTS_DIR = os.path.join(C.ROOT, "reports")
@@ -45,7 +45,9 @@ def run():
     abnormal = [r for r in results if r["anomaly_status"] != "NORMAL"]
     action_queue = [r for r in results
                     if r["priority_band"] in ("CRITICAL", "HIGH")
-                    or r["anomaly_status"] != "NORMAL"]
+                    or r["anomaly_status"] != "NORMAL"
+                    or r.get("constraint_flag")]   # constraint-only assets are the
+                                                   # differentiated behaviour - include them
 
     ts = datetime.now()
     lines = [
@@ -86,6 +88,28 @@ def run():
                                 f"RUL {r['rul_days']}d, anomaly {r['anomaly_status']}.")
             lines.append("- 📧 Alert dispatched to maintenance team.")
         lines.append("")
+
+    # Next-shift plan: allocate the flagged work to crews under crew-hour +
+    # spares constraints. Turns the action queue from a list into an allocated
+    # plan (the operating-process payoff).
+    plan = shift_plan_tool()
+    cap = ", ".join(f"{sk} {c['used']}/{c['total']}h"
+                    for sk, c in plan["capacity"]["by_skill"].items())
+    lines += ["## Next shift plan",
+              f"*{plan['candidate_count']} flagged asset(s); crew-hours allocated by system priority "
+              f"(utilisation: {cap}).*", ""]
+    if plan["scheduled"]:
+        lines.append("**Scheduled this shift:**")
+        lines += [f"- {s['asset_id']} — {s['task']} → {s['crew_id']} "
+                  f"({s['est_hours']}h, sys priority {s['system_priority']})"
+                  for s in plan["scheduled"]]
+    if plan["deferred"]:
+        lines += ["", "**Deferred (capacity):**"]
+        lines += [f"- {d['asset_id']} — {d['reason']}" for d in plan["deferred"]]
+    if plan["procurement"]:
+        lines += ["", "**Procurement / monitored degradation (part infeasible this shift):**"]
+        lines += [f"- {p['asset_id']} — {p['reason']}" for p in plan["procurement"]]
+    lines.append("")
 
     path = os.path.join(REPORTS_DIR, f"preshift_{ts:%Y%m%d_%H%M}.md")
     with open(path, "w", encoding="utf-8") as f:  # report contains non-ASCII (⚠️/📧)

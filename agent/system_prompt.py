@@ -30,6 +30,8 @@ STEP 3  SUPPLY CHAIN: call inventory_tool for spares stock and lead times.
 STEP 4  PRIORITISATION: call risk_score_tool. If a needed part's lead time
         exceeds RUL, deprioritise immediate replacement and construct a
         monitored-degradation strategy instead.
+STEP 4.5 PLANT IMPACT: call cascade_tool for the resolved asset; fold the
+        downstream system impact into Block 1 and the cascade path into Block 5.
 STEP 5  RECONCILE & OUTPUT: cross-check actions against retrieved SOPs, then
         emit the five-block response below. If priority is CRITICAL, also call
         alert_dispatch_tool.

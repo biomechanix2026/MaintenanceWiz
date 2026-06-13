@@ -458,6 +458,78 @@ def risk_score_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
+# TOOL 7.5: Plant cascade impact (bottleneck prioritization at plant level)
+# ==========================================================================
+def cascade_tool(asset_id: str) -> dict:
+    """Plant-level impact of this asset failing: which downstream assets idle,
+    the criticality-weighted blast radius, and a system_priority that escalates
+    own priority by cascade impact. Additive by design - priority_score and
+    RISK_WEIGHTS are untouched (eval-baseline safe).
+    """
+    from agent import cascade
+    own_res = risk_score_tool(asset_id)
+    if "error" in own_res:
+        return {"asset_id": asset_id, "error": own_res["error"]}
+    own = own_res["priority_score"]
+    blast, path = cascade.blast_radius(asset_id)
+    blast_points = round(C.CASCADE_GAIN * blast, 1)
+    system_priority = round(min(100.0, own + blast_points), 1)
+    return {
+        "asset_id": asset_id,
+        "own_priority": own,
+        "blast_radius": round(blast, 2),
+        "blast_points": blast_points,
+        "system_priority": system_priority,
+        "downstream": path,                      # [{asset_id, name, hops, criticality}]
+        "downstream_count": len(path),
+        "path_str": " -> ".join([asset_id] + [d["asset_id"] for d in path]),
+    }
+
+
+# ==========================================================================
+# TOOL 7.6: Next-shift planner (plant-scope; allocates finite crew-hours)
+# ==========================================================================
+def shift_plan_tool() -> dict:
+    """Propose the next-shift action queue for the whole plant: rank flagged
+    assets by system_priority (cascade-aware), allocate finite crew-hours per
+    skill, defer what doesn't fit (with reasons), and divert parts-infeasible
+    jobs to monitored degradation + procurement. Composes existing verified
+    tools - additive; priority_score / RISK_WEIGHTS untouched.
+    """
+    from agent import planner
+    reg = _registry()
+    candidates = []
+    for aid in reg.asset_id:
+        risk = risk_score_tool(aid)
+        if "error" in risk:
+            continue
+        abn = abnormality_tool(aid)
+        flagged = (risk["priority_band"] in ("HIGH", "CRITICAL")
+                   or bool(risk.get("constraint_flag"))
+                   or abn.get("status") != "NORMAL")
+        if not flagged:
+            continue
+        casc = cascade_tool(aid)
+        candidates.append({
+            "asset_id": aid,
+            "asset_type": reg[reg.asset_id == aid].iloc[0]["type"],
+            "system_priority": casc.get("system_priority", risk["priority_score"]),
+            "rul_days": risk["rul_days"],
+            "criticality": risk["criticality"],
+            "priority_band": risk["priority_band"],
+            "constraint_flag": risk.get("constraint_flag"),
+        })
+    crew = pd.read_csv(C.CREW_ROSTER_CSV).to_dict("records")
+    jt = pd.read_csv(C.JOB_TEMPLATES_CSV)
+    templates = {r["asset_type"]: {"task": r["task"], "est_hours": float(r["est_hours"]),
+                                   "required_skill": r["required_skill"]}
+                 for _, r in jt.iterrows()}
+    plan = planner.plan_shift(candidates, crew, templates)
+    plan["candidate_count"] = len(candidates)
+    return plan
+
+
+# ==========================================================================
 # TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def _role_for_band(risk_level: str) -> str:

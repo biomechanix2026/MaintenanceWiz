@@ -99,3 +99,32 @@ ANOMALY_TREND_Z = 0.75
 # prioritisation basis (RUL, criticality, delay history, spares/lead time) and
 # remains reproducible for the eval baseline. Enable with MW_APPLY_FEEDBACK_BIAS=1.
 APPLY_FEEDBACK_BIAS = os.environ.get("MW_APPLY_FEEDBACK_BIAS", "0") == "1"
+
+# --------------------------------------------------------------------------
+# Plant topology (cascade / bottleneck graph)
+# --------------------------------------------------------------------------
+# Hybrid spec (see docs/superpowers/specs/2026-06-08-plant-cascade-graph-design.md):
+# intra-line serial chains + consecutive-line bridges are DERIVED from the two
+# structures below; cross-line utility dependencies are AUTHORED explicitly.
+# Assets in the registry but absent here are isolated nodes (blast radius 0).
+LINE_FLOW = ["Sinter", "Melt Shop", "Caster", "Rolling"]   # material backbone, ordered
+LINE_ASSET_ORDER = {            # serial process order within each line
+    "Sinter":    ["CONV-BELT-03"],
+    "Melt Shop": ["CONV-BELT-08", "FURNACE-01", "LADLE-02"],
+    "Caster":    ["PUMP-19", "HYD-VALVE-07"],
+    "Rolling":   ["ROLL-MILL-04", "ROLL-MILL-11"],
+}
+UTILITY_EDGES = {               # explicit cross-line fan-out
+    "PUMP-12":       ["FURNACE-01", "HYD-VALVE-07"],   # cooling water
+    "COMPRESSOR-09": ["HYD-VALVE-07", "ROLL-MILL-04"], # plant air
+    "GEARBOX-05":    ["ROLL-MILL-04"],                 # mechanical drive
+    "CRANE-06":      ["FURNACE-01"],                   # charge handling
+}
+CASCADE_DECAY = 0.6    # per-hop attenuation of downstream weight
+CASCADE_GAIN = 3.0     # blast-radius units -> system_priority points
+
+# --------------------------------------------------------------------------
+# Next-shift planner (crew-hour + spares constrained allocation)
+# --------------------------------------------------------------------------
+CREW_ROSTER_CSV = os.path.join(DATA_DIR, "crew_roster.csv")
+JOB_TEMPLATES_CSV = os.path.join(DATA_DIR, "job_templates.csv")

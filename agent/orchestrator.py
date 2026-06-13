@@ -39,6 +39,8 @@ TOOL_FUNCS = {
     "sql_query_tool": lambda a: T.sql_query_tool(a["sql"]),
     "delay_history_tool": lambda a: T.delay_history_tool(a["asset_id"]),
     "risk_score_tool": lambda a: T.risk_score_tool(a["asset_id"]),
+    "cascade_tool": lambda a: T.cascade_tool(a["asset_id"]),
+    "shift_plan_tool": lambda a: T.shift_plan_tool(),
     "alert_dispatch_tool": lambda a: T.alert_dispatch_tool(
         a["asset_id"], a["risk_level"], a["summary"], a.get("recipients"),
         role=a.get("role"), dry_run=a.get("dry_run", not _ALERTS_LIVE)),
@@ -77,6 +79,12 @@ TOOL_SCHEMAS = [
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
     {"name": "risk_score_tool", "description": "Deterministic priority score and constraint flag for an asset.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
+    {"name": "cascade_tool",
+     "description": "Plant-level cascade impact for an asset: downstream assets idled by its failure, blast radius, and system_priority (own priority escalated by downstream criticality). Call after risk_score_tool to express plant bottleneck impact.",
+     "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
+    {"name": "shift_plan_tool",
+     "description": "Propose the next-shift action queue for the whole plant: ranks flagged assets by system_priority (cascade-aware), allocates finite crew-hours per skill, defers what does not fit (with reasons), and diverts parts-infeasible jobs to monitored degradation + procurement. Use for plant-scope questions like 'what should we do this shift?' - takes no arguments.",
+     "input_schema": {"type": "object", "properties": {}}},
     {"name": "alert_dispatch_tool", "description": "Dispatch a real-time, role-routed alert for a high-risk asset. Omit recipients to auto-route by severity (critical->supervisor, high->reliability, else maintenance); or pass role (maintenance|reliability|supervisor) or an explicit recipients string.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}, "risk_level": {"type": "string"}, "summary": {"type": "string"}, "recipients": {"type": "string"}, "role": {"type": "string"}}, "required": ["asset_id", "risk_level", "summary"]}},
     {"name": "task_closure_tool", "description": "Check the compliance checklist for a work order; blocks closure if items missing.",
@@ -168,6 +176,7 @@ def run_deterministic(query: str, focus_asset: str | None = None,
     inv = _dispatch("inventory_tool", {"asset_id": aid}, trace)
     delays = _dispatch("delay_history_tool", {"asset_id": aid}, trace)
     risk = _dispatch("risk_score_tool", {"asset_id": aid}, trace)
+    casc = _dispatch("cascade_tool", {"asset_id": aid}, trace)
     sql = _dispatch("sql_query_tool",
                     {"sql": f"SELECT delay_code, COUNT(*) AS n, SUM(downtime_min) AS mins "
                             f"FROM delays WHERE asset_id='{aid}' GROUP BY delay_code ORDER BY mins DESC"},
@@ -194,17 +203,17 @@ def run_deterministic(query: str, focus_asset: str | None = None,
         else:
             alert_line = "\n> **Auto-alert recommended** (CRITICAL) — dispatch on confirmation."
 
-    res.structured = {"asset_id": aid, "risk": risk, "prognostic": prog,
+    res.structured = {"asset_id": aid, "risk": risk, "cascade": casc, "prognostic": prog,
                       "abnormality": abnormality,
                       "inventory": inv, "delays": delays,
                       "alert_recommended": alert_recommended}
     res.answer_markdown = _render(query, aid, prog, shap, top, abnormality, risk, delays,
-                                  inv, sops, incidents, probable, sql, alert_line)
+                                  inv, sops, incidents, probable, sql, alert_line, casc)
     return res
 
 
 def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, incidents,
-            probable, sql, alert_line):
+            probable, sql, alert_line, casc):
     devs = shap.get("deviations", {})
     drivers = ", ".join(f"{f} ({devs.get(f,0):+.1f}σ)" for f in shap.get("ranked_drivers", [])[:3])
     out_parts = [p for p in inv["parts"] if p["qty_on_hand"] == 0]
@@ -249,6 +258,15 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
     inc_md = "\n".join(f"   - {h['source']}" for h in incidents[:2]) or "   - No prior incidents on record."
     sop_md = "\n".join(f"   - {h['source']}" for h in sops[:2]) or "   - No SOP section matched."
 
+    if casc.get("downstream_count"):
+        system_line = (f"\n- **System impact:** idles **{casc['downstream_count']}** downstream asset(s) -> "
+                       f"system priority **{casc['system_priority']}/100** "
+                       f"(blast radius {casc['blast_radius']})")
+        casc_md = f"\n- **Cascade path:** `{casc['path_str']}`"
+    else:
+        system_line = "\n- **System impact:** terminal asset - no downstream dependents"
+        casc_md = ""
+
     fb_n = risk.get("feedback_count", 0)
     fb_md = (f"\n- **Continuous learning:** {fb_n} engineer feedback record(s) on this "
              f"asset re-indexed as advisory context"
@@ -260,7 +278,7 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
 - **Asset:** `{aid}`  |  **Priority:** **{risk['priority_band']}** (score **{risk['priority_score']}/100**)
 - **Remaining Useful Life:** **{prog['rul_days']} days**  |  30-day failure probability: **{prog['failure_probability_30d']:.0%}**
 - **Independent abnormality detector:** **{abn_status}** (score **{abn_score}/100**; catastrophic risk: **{catastrophic}**)
-- **Delay severity:** {delays['events']} events, {delays['total_downtime_min']} min downtime, {delays['tonnage_lost']:.0f} t lost{alert_line}
+- **Delay severity:** {delays['events']} events, {delays['total_downtime_min']} min downtime, {delays['tonnage_lost']:.0f} t lost{alert_line}{system_line}
 
 ### 2. Diagnostic & Root-Cause Breakdown
 - **Probable fault:** {probable}
@@ -287,7 +305,7 @@ def _render(query, aid, prog, shap, top, abnormality, risk, delays, inv, sops, i
 - **Structured query run (validate in UI):**
 ```sql
 {sql['sql']}
-```{fb_md}
+```{casc_md}{fb_md}
 """
     return md
 
@@ -302,6 +320,7 @@ def _structured_from_trace(trace: list, asset_id: str | None) -> dict:
         return next((t["output"] for t in reversed(trace) if t["tool"] == tool), None)
     risk = last("risk_score_tool") or {}
     out = {"asset_id": asset_id, "risk": risk,
+           "cascade": last("cascade_tool"),
            "prognostic": last("prognostic_tool"),
            "abnormality": last("abnormality_tool"),
            "inventory": last("inventory_tool"),

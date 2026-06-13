@@ -1,0 +1,142 @@
+{
+  "nodes": [
+    {
+      "asset_id": "FURNACE-01",
+      "name": "Electric Arc Furnace 1",
+      "type": "furnace",
+      "line": "Melt Shop",
+      "criticality": 5
+    },
+    {
+      "asset_id": "LADLE-02",
+      "name": "Ladle Refining Furnace 2",
+      "type": "furnace",
+      "line": "Melt Shop",
+      "criticality": 5
+    },
+    {
+      "asset_id": "CONV-BELT-03",
+      "name": "Sinter Conveyor Belt 3",
+      "type": "conveyor",
+      "line": "Sinter",
+      "criticality": 4
+    },
+    {
+      "asset_id": "CONV-BELT-08",
+      "name": "Charge Conveyor Belt 8",
+      "type": "conveyor",
+      "line": "Melt Shop",
+      "criticality": 3
+    },
+    {
+      "asset_id": "PUMP-12",
+      "name": "Cooling Water Pump 12",
+      "type": "pump",
+      "line": "Utilities",
+      "criticality": 4
+    },
+    {
+      "asset_id": "PUMP-19",
+      "name": "Hydraulic Supply Pump 19",
+      "type": "pump",
+      "line": "Caster",
+      "criticality": 3
+    },
+    {
+      "asset_id": "HYD-VALVE-07",
+      "name": "Mold Hydraulic Valve 7",
+      "type": "valve",
+      "line": "Caster",
+      "criticality": 4
+    },
+    {
+      "asset_id": "ROLL-MILL-04",
+      "name": "Hot Strip Roll Mill 4",
+      "type": "mill",
+      "line": "Rolling",
+      "criticality": 5
+    },
+    {
+      "asset_id": "ROLL-MILL-11",
+      "name": "Cold Roll Stand 11",
+      "type": "mill",
+      "line": "Rolling",
+      "criticality": 4
+    },
+    {
+      "asset_id": "GEARBOX-05",
+      "name": "Mill Drive Gearbox 5",
+      "type": "gearbox",
+      "line": "Rolling",
+      "criticality": 4
+    },
+    {
+      "asset_id": "COMPRESSOR-09",
+      "name": "Plant Air Compressor 9",
+      "type": "compressor",
+      "line": "Utilities",
+      "criticality": 3
+    },
+    {
+      "asset_id": "CRANE-06",
+      "name": "Charge Bay EOT Crane 6",
+      "type": "crane",
+      "line": "Melt Shop",
+      "criticality": 3
+    }
+  ],
+  "edges": [
+    {
+      "src": "COMPRESSOR-09",
+      "dst": "HYD-VALVE-07"
+    },
+    {
+      "src": "COMPRESSOR-09",
+      "dst": "ROLL-MILL-04"
+    },
+    {
+      "src": "CONV-BELT-03",
+      "dst": "CONV-BELT-08"
+    },
+    {
+      "src": "CONV-BELT-08",
+      "dst": "FURNACE-01"
+    },
+    {
+      "src": "CRANE-06",
+      "dst": "FURNACE-01"
+    },
+    {
+      "src": "FURNACE-01",
+      "dst": "LADLE-02"
+    },
+    {
+      "src": "GEARBOX-05",
+      "dst": "ROLL-MILL-04"
+    },
+    {
+      "src": "HYD-VALVE-07",
+      "dst": "ROLL-MILL-04"
+    },
+    {
+      "src": "LADLE-02",
+      "dst": "PUMP-19"
+    },
+    {
+      "src": "PUMP-12",
+      "dst": "FURNACE-01"
+    },
+    {
+      "src": "PUMP-12",
+      "dst": "HYD-VALVE-07"
+    },
+    {
+      "src": "PUMP-19",
+      "dst": "HYD-VALVE-07"
+    },
+    {
+      "src": "ROLL-MILL-04",
+      "dst": "ROLL-MILL-11"
+    }
+  ]
+}
