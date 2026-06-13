@@ -172,5 +172,81 @@ def test_T3_simulator_is_pure():
         assert forbidden not in src, f"simulator core must not contain {forbidden!r}"
 
 
+# ---- T4: tool layer + registries + feasibility ----------------------------
+@suite.case
+def test_T4_tools_in_both_registries():
+    from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
+    for name in ("cost_tool", "risk_simulator_tool"):
+        assert name in TOOL_FUNCS, f"{name} missing from TOOL_FUNCS"
+        assert any(s["name"] == name for s in TOOL_SCHEMAS), f"{name} missing from TOOL_SCHEMAS"
+
+
+@suite.case
+def test_T4_cost_tool_shape_and_proxy():
+    from agent.tools import cost_tool
+    out = cost_tool("GEARBOX-05")
+    ec = out["event_cost_proxy"]
+    assert ec["label"] == "expected event-cost proxy", ec
+    # per-event basis: never the raw historical total
+    import config as C, pandas as pd
+    dl = pd.read_csv(C.DELAY_LOGS_CSV)
+    g = dl[dl.asset_id == "GEARBOX-05"]
+    if len(g) > 0:
+        assert ec["event_count"] == len(g), ec
+        assert ec["downtime_min_per_event"] <= g["downtime_min"].sum(), "must divide by events"
+    assert "feasibility" in out and "action" in out["feasibility"], out
+    assert "emv" in out and "expected_value_preserved_usd" in out["emv"], out
+
+
+@suite.case
+def test_T4_mixed_stock_uses_job_primary_part():
+    # GEARBOX-05 has PINION-G5 out of stock and OIL-VG320 in stock. The in-stock
+    # oil must not make the pinion replacement job repairable.
+    from agent.tools import cost_tool, prognostic_tool
+    gb = cost_tool("GEARBOX-05")
+    assert gb["planned_job"]["primary_part_no"] == "PINION-G5", gb
+    assert gb["feasibility"]["action"] != "repair_now", gb["feasibility"]
+
+    hv = cost_tool("HYD-VALVE-07")
+    assert hv["planned_job"]["primary_part_no"] == "SPOOL-HV7", hv
+    rul = prognostic_tool("HYD-VALVE-07")["rul_days"]
+    expected = "procure_for_window" if 18 < rul else "monitor"
+    assert hv["feasibility"]["action"] == expected, (rul, hv["feasibility"])
+
+
+@suite.case
+def test_T4_unresolved_primary_part_is_not_repairable():
+    # LADLE-02 is a furnace-type asset but has no ELEC-CLMP1 inventory row. The
+    # resolver must not substitute another asset's furnace part or longest-lead part.
+    from agent.tools import cost_tool
+    out = cost_tool("LADLE-02")
+    assert out["primary_part_unresolved"] is True, out
+    assert out["planned_job"]["primary_part_no"] is None, out["planned_job"]
+    assert out["feasibility"]["action"] in {"monitor", "defer_capacity"}, out["feasibility"]
+
+
+@suite.case
+def test_T4_risk_simulator_tool_buckets_and_distribution():
+    from agent.tools import risk_simulator_tool
+    out = risk_simulator_tool()
+    sim = out["simulation"]
+    for k in ("mean_eml_usd", "p50_eml_usd", "p90_eml_usd", "p95_eml_usd",
+              "trial_count", "seed"):
+        assert k in sim, sim
+    # no deferred-bucket asset may be prescribed repair_now
+    procure_seen = False
+    for p in out["prescriptions"]:
+        if p.get("planner_bucket") == "deferred":
+            assert p["action"] == "defer_capacity", p
+        if p["action"] == "procure_for_window":
+            procure_seen = True
+            assert p["lead_time_days"] < p["predicted_rul_days"], p
+            assert p["gross_averted_eml_usd"] == 0.0, p
+            assert p["net_averted_eml_usd"] == 0.0, p
+            assert p["value_at_risk_usd"] is not None, p
+            assert "planned_action_cost_usd" in p, p
+    assert procure_seen, "expected at least one procure_for_window candidate in demo data"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

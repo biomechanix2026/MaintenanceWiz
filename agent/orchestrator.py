@@ -42,6 +42,8 @@ TOOL_FUNCS = {
     "cascade_tool": lambda a: T.cascade_tool(a["asset_id"]),
     "shift_plan_tool": lambda a: T.shift_plan_tool(),
     "work_order_draft_tool": lambda a: T.work_order_draft_tool(a.get("persist", False)),
+    "cost_tool": lambda a: T.cost_tool(a["asset_id"]),
+    "risk_simulator_tool": lambda a: T.risk_simulator_tool(a.get("trials")),
     "alert_dispatch_tool": lambda a: T.alert_dispatch_tool(
         a["asset_id"], a["risk_level"], a["summary"], a.get("recipients"),
         role=a.get("role"), dry_run=a.get("dry_run", not _ALERTS_LIVE)),
@@ -89,6 +91,25 @@ TOOL_SCHEMAS = [
     {"name": "work_order_draft_tool",
      "description": "Draft one trace-backed DRAFT work order per scheduled next-shift job (composes shift_plan_tool + risk/cascade/spares/SOP evidence + crew + planned hours). Parts-infeasible/deferred jobs get none. Approval-gated: drafts only, never auto-closed. Pass persist=true to write JSON artifacts (opt-in side effect); default is side-effect-free.",
      "input_schema": {"type": "object", "properties": {"persist": {"type": "boolean"}}}},
+    {
+        "name": "cost_tool",
+        "description": ("Estimated expected event-cost proxy, the feasible maintenance "
+                        "action, and the expected value preserved (act now vs. run to "
+                        "failure) for one asset. Dollar figures come only from this tool."),
+        "input_schema": {"type": "object",
+                         "properties": {"asset_id": {"type": "string"}},
+                         "required": ["asset_id"]},
+    },
+    {
+        "name": "risk_simulator_tool",
+        "description": ("Seeded Monte-Carlo plant-risk distribution (expected monetary "
+                        "loss percentile bands) and a ranked list of FEASIBLE next-shift "
+                        "actions. repair_now rows report estimated value preserved; "
+                        "procurement/monitor rows report value at risk. Plant-scope; no asset_id."),
+        "input_schema": {"type": "object",
+                         "properties": {"trials": {"type": "integer"}},
+                         "required": []},
+    },
     {"name": "alert_dispatch_tool", "description": "Dispatch a real-time, role-routed alert for a high-risk asset. Omit recipients to auto-route by severity (critical->supervisor, high->reliability, else maintenance); or pass role (maintenance|reliability|supervisor) or an explicit recipients string.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}, "risk_level": {"type": "string"}, "summary": {"type": "string"}, "recipients": {"type": "string"}, "role": {"type": "string"}}, "required": ["asset_id", "risk_level", "summary"]}},
     {"name": "task_closure_tool", "description": "Check the compliance checklist for a work order; blocks closure if items missing.",

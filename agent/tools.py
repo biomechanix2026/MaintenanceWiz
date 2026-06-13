@@ -605,6 +605,203 @@ def work_order_draft_tool(persist: bool = False, out_dir: str | None = None) -> 
 
 
 # ==========================================================================
+# TOOL 7.9: cost_tool (asset-scope financial exposure; folds into Blocks 1 & 4)
+# ==========================================================================
+def _primary_part(asset_id: str, asset_type: str) -> dict | None:
+    """Resolve the limiting part for the asset's templated job via job_templates'
+    primary_part_no, matched into this asset's own inventory rows by exact part_no.
+    Never substitute a different physical part."""
+    jt = pd.read_csv(C.JOB_TEMPLATES_CSV)
+    row = jt[jt.asset_type == asset_type]
+    if row.empty or "primary_part_no" not in jt.columns:
+        return {"unresolved": True, "primary_part_no": None,
+                "reason": "no job template primary_part_no"}
+    want_raw = row.iloc[0].get("primary_part_no")
+    if pd.isna(want_raw) or not str(want_raw).strip():
+        return {"unresolved": True, "primary_part_no": None,
+                "reason": "blank job template primary_part_no"}
+    want = str(want_raw).strip()
+    inv = inventory_tool(asset_id).get("parts", [])
+    match = next((p for p in inv if p["part_no"] == want), None)
+    if match is None:
+        return {"unresolved": True, "primary_part_no": want,
+                "reason": "primary part not stocked for this asset; mapping unresolved"}
+    return {**match, "unresolved": False, "primary_part_no": want}
+
+
+def cost_tool(asset_id: str) -> dict:
+    """Estimated expected event-cost proxy, feasible action, and EMV for one asset.
+    All dollar figures derive from tool outputs + config economics (never invented)."""
+    from agent import cascade, economics
+    reg = _registry()
+    row = reg[reg.asset_id == asset_id]
+    if row.empty:
+        return {"error": f"Unknown asset {asset_id}"}
+    atype = row.iloc[0]["type"]
+
+    # per-event proxy (divide aggregate delay history by event count; type default if none)
+    dl = delay_history_tool(asset_id)
+    events = dl.get("events", 0)
+    if events > 0:
+        dt_per = dl["total_downtime_min"] / events
+        tn_per = dl["tonnage_lost"] / events
+    else:
+        dt_per = C.DEFAULT_EVENT_DOWNTIME_MIN_BY_TYPE.get(atype, 60)
+        tn_per = C.DEFAULT_EVENT_TONNAGE_LOST_BY_TYPE.get(atype, 20)
+
+    rate = C.DOWNTIME_COST_USD_PER_HOUR.get(atype)
+    if rate is None:
+        return {"error": f"No DOWNTIME_COST_USD_PER_HOUR for type {atype}"}
+
+    own = economics.direct_event_cost(
+        asset_type=atype, downtime_min_per_event=dt_per, tonnage_lost_per_event=tn_per,
+        downtime_cost_usd_per_hour=rate, tonnage_margin_usd_per_ton=C.TONNAGE_MARGIN_USD_PER_TON)
+
+    # cascade-coupled failure cost (composition lives HERE, not in the pure core)
+    failure_cost = own["total_usd"]
+    for nid, hops in cascade.downstream(asset_id):
+        nrow = reg[reg.asset_id == nid]
+        if nrow.empty:
+            continue
+        ntype = nrow.iloc[0]["type"]
+        nrate = C.DOWNTIME_COST_USD_PER_HOUR.get(ntype, rate)
+        nd = economics.direct_event_cost(
+            asset_type=ntype,
+            downtime_min_per_event=C.DEFAULT_EVENT_DOWNTIME_MIN_BY_TYPE.get(ntype, 60),
+            tonnage_lost_per_event=C.DEFAULT_EVENT_TONNAGE_LOST_BY_TYPE.get(ntype, 20),
+            downtime_cost_usd_per_hour=nrate,
+            tonnage_margin_usd_per_ton=C.TONNAGE_MARGIN_USD_PER_TON)
+        failure_cost += nd["total_usd"] * (C.CASCADE_DECAY ** hops)
+
+    prog = prognostic_tool(asset_id)
+    p_fail = prog.get("failure_probability_30d", 0.0)
+    rul = prog.get("rul_days", C.MAX_RUL_DAYS)
+
+    jt = pd.read_csv(C.JOB_TEMPLATES_CSV)
+    trow = jt[jt.asset_type == atype]
+    est_hours = float(trow.iloc[0]["est_hours"]) if not trow.empty else 3.0
+    task = str(trow.iloc[0]["task"]) if not trow.empty else "Inspect asset"
+    part = _primary_part(asset_id, atype)
+    unresolved = bool(part and part.get("unresolved"))
+    template_part_no = part.get("primary_part_no") if part else None
+    part_no = None if unresolved else (part["part_no"] if part else None)
+    part_cost = 0.0 if unresolved or not part else float(part["unit_cost_usd"])
+    in_stock = bool(part and not unresolved and part["qty_on_hand"] > 0)
+    lead = int(part["lead_time_days"]) if part and not unresolved else None
+
+    # feasibility action (planner-bucket anchoring is applied in risk_simulator_tool)
+    if unresolved:
+        action, reason = "monitor", "primary part not stocked for this asset; mapping unresolved"
+        act_cost = 0.0
+    elif in_stock:
+        action, reason = "repair_now", "primary part in stock"
+        act_cost = economics.planned_action_cost(
+            planned_hours=est_hours, downtime_cost_usd_per_hour=rate,
+            planned_stop_cost_factor=C.PLANNED_STOP_COST_FACTOR,
+            primary_part_unit_cost_usd=part_cost)["total_usd"]
+    elif lead is not None and lead < rul:
+        action, reason = "procure_for_window", "out of stock; normal lead within RUL"
+        act_cost = economics.planned_action_cost(
+            planned_hours=est_hours, downtime_cost_usd_per_hour=rate,
+            planned_stop_cost_factor=C.PLANNED_STOP_COST_FACTOR,
+            primary_part_unit_cost_usd=part_cost)["total_usd"]
+    else:
+        action, reason = "monitor", "primary part lead time exceeds predicted RUL"
+        act_cost = 0.0
+
+    val = economics.emv(p_failure=p_fail, failure_cost_usd=failure_cost, action_cost_usd=act_cost)
+    return {
+        "asset_id": asset_id,
+        "event_cost_proxy": {
+            "label": own["label"], "event_count": int(events),
+            "downtime_min_per_event": round(dt_per, 1),
+            "tonnage_lost_per_event": round(tn_per, 1),
+            "total_usd": own["total_usd"],
+        },
+        "failure_cost_usd": round(failure_cost, 2),
+        "primary_part_unresolved": unresolved,
+        "planned_job": {"task": task, "primary_part_no": part_no,
+                        "template_primary_part_no": template_part_no,
+                        "est_hours": est_hours},
+        "feasibility": {"action": action, "reason": reason,
+                        "lead_time_days": lead, "predicted_rul_days": round(rul, 1),
+                        "in_stock": in_stock},
+        "emv": val,
+    }
+
+
+# ==========================================================================
+# TOOL 7.95: risk_simulator_tool (plant-scope EML distribution + prescription)
+# ==========================================================================
+def risk_simulator_tool(trials: int | None = None) -> dict:
+    """Seeded plant-risk distribution and feasible-action prescription, anchored to
+    the next-shift planner's buckets so prescriptions are crew- and parts-feasible."""
+    from agent import cascade, risk_simulator
+    reg = _registry()
+    g = cascade.build_graph()
+    nodes = list(g.keys())
+    edges = [(u, v, C.CASCADE_DECAY) for u, vs in g.items() for v in vs]
+
+    seed_probs, node_cost, cost_by_asset = {}, {}, {}
+    for nid in nodes:
+        c = cost_tool(nid)
+        if "error" in c:
+            continue
+        cost_by_asset[nid] = c
+        node_cost[nid] = c["event_cost_proxy"]["total_usd"]
+        seed_probs[nid] = prognostic_tool(nid).get("failure_probability_30d", 0.0)
+
+    n_trials = int(trials or C.SIMULATION_TRIALS)
+    sim = risk_simulator.simulate_plant_risk(
+        nodes, edges, seed_probs, node_cost, trials=n_trials, seed=C.SIMULATION_SEED)
+    loss_contrib = sim.get("loss_contributions", {})
+
+    # planner buckets -> per-asset bucket label for feasibility anchoring
+    plan = shift_plan_tool()
+    bucket = {}
+    for r in plan.get("scheduled", []):
+        bucket[r["asset_id"]] = "scheduled"
+    for r in plan.get("procurement", []):
+        bucket[r["asset_id"]] = "procurement-monitor"
+    for r in plan.get("deferred", []):
+        bucket[r["asset_id"]] = "deferred"
+
+    candidates = []
+    for nid, c in cost_by_asset.items():
+        b = bucket.get(nid)
+        if b is None:
+            continue                          # not flagged this shift
+        feas = c["feasibility"]["action"]
+        if b == "deferred":
+            action = "defer_capacity"
+        elif b == "scheduled" and feas == "repair_now":
+            action = "repair_now"
+        else:
+            action = feas if feas in ("procure_for_window", "monitor") else "monitor"
+        planned_action_cost = c["emv"]["action_cost_usd"]
+        current_shift_cost = planned_action_cost if action == "repair_now" else 0.0
+        candidates.append({
+            "asset_id": nid, "planner_bucket": b, "action": action,
+            "primary_part_no": c["planned_job"]["primary_part_no"],
+            "primary_part_unresolved": c.get("primary_part_unresolved", False),
+            "lead_time_days": c["feasibility"]["lead_time_days"],
+            "predicted_rul_days": c["feasibility"]["predicted_rul_days"],
+            "intervention_cost_usd": current_shift_cost,
+            "planned_action_cost_usd": planned_action_cost,
+            "value_at_risk_usd": loss_contrib.get(nid, 0.0),
+        })
+
+    ranked = risk_simulator.rank_interventions(
+        nodes, edges, seed_probs, node_cost, candidates,
+        trials=n_trials, seed=C.SIMULATION_SEED)
+    return {"simulation": {k: sim[k] for k in
+                           ("mean_eml_usd", "p50_eml_usd", "p90_eml_usd",
+                            "p95_eml_usd", "trial_count", "seed")},
+            "top_contributors": sim["top_contributors"],
+            "prescriptions": ranked}
+
+
+# ==========================================================================
 # TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def _role_for_band(risk_level: str) -> str:
