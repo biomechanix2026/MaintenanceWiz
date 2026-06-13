@@ -301,5 +301,33 @@ def test_T6_planner_sort_unchanged():
     assert sps == sorted(sps, reverse=True), sps
 
 
+# ---- T7: hosted demo excludes the new tools + prompt -----------------------
+@suite.case
+def test_T7_hosted_excludes_new_tools_and_prompt():
+    import json, os, config as C
+    from scripts.build_demo_assets import demo_tools, hosted_system_prompt, EXCLUDED_TOOLS
+
+    assert {"cost_tool", "risk_simulator_tool"} <= EXCLUDED_TOOLS, EXCLUDED_TOOLS
+    names = {t.get("name") for t in demo_tools()}
+    assert "cost_tool" not in names, "hosted demo must exclude cost_tool"
+    assert "risk_simulator_tool" not in names, "hosted demo must exclude risk_simulator_tool"
+
+    hp = hosted_system_prompt()
+    # The STEP 4.7 financial block (which orders the excluded tools) is stripped.
+    # DEMO_NOTE may still NAME them in its "never promise these local-only tools"
+    # list - same convention as cascade_tool - so we assert no imperative ordering,
+    # not bare absence.
+    assert "STEP 4.7" not in hp, "STEP 4.7 financial block not stripped from hosted prompt"
+    assert "call cost_tool" not in hp, "hosted prompt must not order cost_tool"
+
+    path = os.path.join(C.ROOT, "web", "data", "tools.json")
+    if not os.path.exists(path):
+        from evals._harness import gap
+        gap("web/data/tools.json not generated in this environment")
+    names_json = {t.get("name") for t in json.load(open(path, encoding="utf-8"))}
+    assert "cost_tool" not in names_json, "hosted demo must exclude cost_tool"
+    assert "risk_simulator_tool" not in names_json, "hosted demo must exclude risk_simulator_tool"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

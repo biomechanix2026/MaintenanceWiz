@@ -359,6 +359,18 @@ def _render_next_shift_plan():
         else:
             st.caption("No spares-blocked jobs.")
 
+    st.markdown("**Plant-risk simulation (estimated expected monetary loss)**")
+    with st.spinner("Running seeded Monte-Carlo over the plant topology..."):
+        sim = T.risk_simulator_tool()
+    s = sim["simulation"]
+    st.caption(f"{s['trial_count']} seeded trials (seed {s['seed']}); percentile bands, "
+               f"not confidence intervals.")
+    st.write({"mean": f"${s['mean_eml_usd']:,.0f}", "p50": f"${s['p50_eml_usd']:,.0f}",
+              "p90": f"${s['p90_eml_usd']:,.0f}", "p95": f"${s['p95_eml_usd']:,.0f}"})
+    if sim["prescriptions"]:
+        st.markdown("**Feasible actions (value preserved for repair_now; value at risk otherwise):**")
+        st.dataframe(pd.DataFrame(sim["prescriptions"]), hide_index=True, use_container_width=True)
+
 
 if st.query_params.get("wallboard") == "1":
     render_wallboard()

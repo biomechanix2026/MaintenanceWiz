@@ -35,9 +35,10 @@ def test_demo_tools_subset_and_gemini_format():
     tools = demo_tools()
     names = {t["name"] for t in tools}
     assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool", "cascade_tool",
-                              "shift_plan_tool", "work_order_draft_tool"}
+                              "shift_plan_tool", "work_order_draft_tool",
+                              "cost_tool", "risk_simulator_tool"}
     assert names.isdisjoint(EXCLUDED_TOOLS)
-    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 15
+    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 17
     assert names <= set(TOOL_FUNCS)            # every exported tool is real
     for t in tools:                            # Gemini format, not Anthropic
         assert "parameters" in t and "input_schema" not in t
@@ -51,8 +52,26 @@ def test_hosted_prompt_strips_local_only_steps():
     hp = hosted_system_prompt()
     assert "STEP 4.5" not in hp, "STEP 4.5 block not stripped from hosted prompt"
     assert "call cascade_tool" not in hp, "hosted prompt still orders cascade_tool"
+    assert "STEP 4.7" not in hp, "STEP 4.7 financial block not stripped from hosted prompt"
+    assert "call cost_tool" not in hp, "hosted prompt still orders cost_tool"
     assert "STEP 5" in hp, "strip over-ran into STEP 5"
     assert "Hosted-demo deployment note" in hp, "DEMO_NOTE missing from hosted prompt"
+
+
+def test_vercel_config_bundles_chat_data_and_allows_agent_turns():
+    import json
+    cfg = json.loads((_ROOT / "web" / "vercel.json").read_text(encoding="utf-8"))
+    chat_cfg = cfg.get("functions", {}).get("api/chat.py")
+    assert chat_cfg, "web/vercel.json must configure api/chat.py"
+    assert chat_cfg.get("includeFiles") == "data/**"
+    assert chat_cfg.get("maxDuration", 0) >= 60
+
+
+def test_pyproject_does_not_shadow_vercel_function_config():
+    import tomllib
+    pyproject = tomllib.loads(
+        (_ROOT / "web" / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "vercel" not in pyproject.get("tool", {})
 
 
 def test_validate_snapshot_accepts_good():

@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
 from agent.tools import (risk_score_tool, prognostic_tool, abnormality_tool,
                          inventory_tool, alert_dispatch_tool, shift_plan_tool,
-                         work_order_draft_tool)
+                         work_order_draft_tool, risk_simulator_tool)
 from config import ALERT_THRESHOLD
 
 REPORTS_DIR = os.path.join(C.ROOT, "reports")
@@ -110,6 +110,22 @@ def run():
     if plan["procurement"]:
         lines += ["", "**Procurement / monitored degradation (part infeasible this shift):**"]
         lines += [f"- {p['asset_id']} — {p['reason']}" for p in plan["procurement"]]
+    lines.append("")
+
+    # Plant-risk simulation: estimated expected monetary loss + top feasible action.
+    sim = risk_simulator_tool()
+    s = sim["simulation"]
+    top = sim["prescriptions"][0] if sim["prescriptions"] else None
+    lines += ["## Plant-risk simulation (estimated, percentile bands)",
+              f"- Estimated plant exposure: mean ~${s['mean_eml_usd']:,.0f} "
+              f"(p90 ~${s['p90_eml_usd']:,.0f}) over {s['trial_count']} seeded trials."]
+    if top:
+        if top["action"] == "repair_now":
+            lines.append(f"- Top feasible action: **repair_now** on {top['asset_id']} "
+                         f"(~${top['net_averted_eml_usd']:,.0f} estimated value preserved).")
+        else:
+            lines.append(f"- Top feasible action: **{top['action']}** on {top['asset_id']} "
+                         f"(~${top['value_at_risk_usd']:,.0f} estimated value at risk pending action).")
     lines.append("")
 
     # Draft trace-backed work orders for the scheduled jobs (system of action).

@@ -5,13 +5,15 @@ Everything is exported from the real tool suite (agent.orchestrator.TOOL_SCHEMAS
 agent.tools.*, knowledge.rag.build_chunks) so the hosted demo cannot drift from
 the local implementation.
 
-The hosted demo exposes 10 of the 15 tools. Excluded:
+The hosted demo exposes 10 of the 17 tools. Excluded:
 - fault_mode_tool        (needs the optional sklearn fault_model.pkl artifact)
 - feedback_tool          (persists to CSV + reindexes; writes don't survive a
                           stateless serverless instance)
 - cascade_tool           (reads config.py topology; the demo bundles no config.py)
 - shift_plan_tool        (plant-wide scan over config + live tools; not snapshot-friendly)
 - work_order_draft_tool  (composes shift_plan_tool + writes draft artifacts; out of scope for the demo)
+- cost_tool              (local-only: reads config economics and composes live plant tools)
+- risk_simulator_tool    (local-only: composes plant topology, planner buckets and live risk tools)
 alert_dispatch_tool is exported but the serverless core forces dry_run.
 
 Run:  python -m scripts.build_demo_assets              # full export
@@ -35,7 +37,8 @@ from knowledge.rag import build_chunks
 
 WEB_DATA = os.path.join(C.ROOT, "web", "data")
 EXCLUDED_TOOLS = {"fault_mode_tool", "feedback_tool", "cascade_tool",
-                  "shift_plan_tool", "work_order_draft_tool"}
+                  "shift_plan_tool", "work_order_draft_tool",
+                  "cost_tool", "risk_simulator_tool"}
 
 DEMO_NOTE = """
 
@@ -43,9 +46,10 @@ DEMO_NOTE = """
 This is the slim hosted build. Differences from the full local build:
 - prognostic_tool, abnormality_tool and risk_score_tool return a snapshot
   computed from the latest sensor readings at export time.
-- fault_mode_tool, feedback_tool, cascade_tool and shift_plan_tool exist only
-  in the full local build; never reference or promise them. (The cascade
-  pipeline step is stripped from this prompt, so you will not see it.)
+- fault_mode_tool, feedback_tool, cascade_tool, shift_plan_tool, cost_tool and
+  risk_simulator_tool exist only in the full local build; never reference or
+  promise them. (The cascade and financial pipeline steps are stripped from this
+  prompt, so you will not see them.)
 - alert_dispatch_tool always runs dry-run here: report the routed alert and
   say live dispatch is disabled in the hosted demo.
 - Retrieval is keyword (BM25) only. Name the source document/section for
@@ -60,23 +64,30 @@ def demo_tools() -> list[dict]:
             for t in TOOL_SCHEMAS if t["name"] not in EXCLUDED_TOOLS]
 
 
+# Pipeline steps that order tools the hosted build excludes. Each block runs from
+# its "STEP X" line until the next "STEP " line and is removed wholesale, so the
+# exported prompt never orders an unavailable tool.
+LOCAL_ONLY_STEP_PREFIXES = ("STEP 4.5", "STEP 4.7")
+
+
 def hosted_system_prompt() -> str:
     """SYSTEM_PROMPT with local-only pipeline steps stripped, plus DEMO_NOTE.
 
-    Deterministically removes the STEP 4.5 PLANT IMPACT block (it would order the
-    hosted model to call cascade_tool, which the hosted build excludes) before
-    appending the deployment note. Pure -> unit-testable in evals/demo_tests.py,
-    so the guarantee 'the exported prompt never orders an unavailable tool' is a
-    checkable property, not an assumption about instruction precedence.
+    Deterministically removes the STEP 4.5 PLANT IMPACT block (cascade_tool) and the
+    STEP 4.7 FINANCIALS block (cost_tool / risk_simulator_tool), all excluded from
+    the hosted build, before appending the deployment note. Pure -> unit-testable in
+    evals/demo_tests.py, so the guarantee 'the exported prompt never orders an
+    unavailable tool' is a checkable property, not an assumption about precedence.
     """
     kept, skip = [], False
     for ln in SYSTEM_PROMPT.splitlines():
-        if ln.lstrip().startswith("STEP 4.5"):
+        stripped = ln.lstrip()
+        if any(stripped.startswith(p) for p in LOCAL_ONLY_STEP_PREFIXES):
             skip = True
             continue
-        if skip and ln.lstrip().startswith("STEP "):   # next real step ends the block
+        if skip and stripped.startswith("STEP "):       # next real step ends the block
             skip = False
-        if skip:                                        # continuation line of STEP 4.5
+        if skip:                                        # continuation line of a stripped block
             continue
         kept.append(ln)
     return "\n".join(kept) + DEMO_NOTE
