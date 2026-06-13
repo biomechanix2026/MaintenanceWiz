@@ -82,5 +82,95 @@ def test_T2_economics_is_pure():
         assert forbidden not in src, f"economics core must not contain {forbidden!r}"
 
 
+# ---- T3: risk simulator core (seeded, CRN, suppression) --------------------
+def _chain_fixture():
+    # A -> B -> C, every edge weight 0.6, costs 100 each.
+    nodes = ["A", "B", "C"]
+    edges = [("A", "B", 0.6), ("B", "C", 0.6)]
+    node_cost = {"A": 100.0, "B": 100.0, "C": 100.0}
+    return nodes, edges, node_cost
+
+
+@suite.case
+def test_T3_baseline_reproducible_and_banded():
+    from agent import risk_simulator as S
+    nodes, edges, cost = _chain_fixture()
+    seed_probs = {"A": 1.0, "B": 0.0, "C": 0.0}   # A always seeds
+    a = S.simulate_plant_risk(nodes, edges, seed_probs, cost, trials=4000, seed=42)
+    b = S.simulate_plant_risk(nodes, edges, seed_probs, cost, trials=4000, seed=42)
+    assert a == b, "same seed must be byte-reproducible"
+    # E[loss] = 100 + 100*0.6 + 100*0.36 = 196
+    approx(a["mean_eml_usd"], 188.0, 204.0)
+    assert a["trial_count"] == 4000 and a["seed"] == 42, a
+    assert set(a["loss_contributions"]) == set(nodes), a["loss_contributions"]
+
+
+@suite.case
+def test_T3_suppression_monotonic_with_crn():
+    from agent import risk_simulator as S
+    nodes, edges, cost = _chain_fixture()
+    seed_probs = {"A": 0.7, "B": 0.3, "C": 0.2}
+    ranked = S.rank_interventions(
+        nodes, edges, seed_probs, cost,
+        candidates=[{"asset_id": n, "action": "repair_now",
+                     "intervention_cost_usd": 0.0} for n in nodes],
+        trials=4000, seed=42)
+    # CRN guarantees suppressing a spontaneous seed never raises EML
+    for r in ranked:
+        assert r["gross_averted_eml_usd"] >= -1e-9, r
+
+
+@suite.case
+def test_T3_ranking_and_no_suppress_actions():
+    from agent import risk_simulator as S
+    nodes, edges, cost = _chain_fixture()
+    seed_probs = {"A": 0.9, "B": 0.0, "C": 0.5}
+    ranked = S.rank_interventions(
+        nodes, edges, seed_probs, cost,
+        candidates=[
+            {"asset_id": "A", "action": "repair_now", "intervention_cost_usd": 5.0},
+            {"asset_id": "C", "action": "repair_now", "intervention_cost_usd": 5.0},
+            {"asset_id": "B", "action": "monitor", "intervention_cost_usd": 0.0},
+        ],
+        trials=4000, seed=42)
+    # A drives the chain -> highest net averted; B is monitor -> exactly 0 averted
+    assert ranked[0]["asset_id"] == "A", ranked
+    b = [r for r in ranked if r["asset_id"] == "B"][0]
+    assert b["gross_averted_eml_usd"] == 0.0, b
+
+
+@suite.case
+def test_T3_procurement_does_not_suppress_current_shift():
+    from agent import risk_simulator as S
+    nodes, edges, cost = _chain_fixture()
+    ranked = S.rank_interventions(
+        nodes, edges, {"A": 1.0, "B": 0.0, "C": 0.0}, cost,
+        candidates=[{"asset_id": "A", "action": "procure_for_window",
+                     "intervention_cost_usd": 0.0}],
+        trials=1000, seed=42)
+    p = ranked[0]
+    assert p["gross_averted_eml_usd"] == 0.0, p
+    assert p["net_averted_eml_usd"] == 0.0, p
+
+
+@suite.case
+def test_T3_cycle_terminates():
+    from agent import risk_simulator as S
+    nodes = ["X", "Y"]
+    edges = [("X", "Y", 0.6), ("Y", "X", 0.6)]   # authored cycle
+    out = S.simulate_plant_risk(nodes, edges, {"X": 0.5, "Y": 0.5},
+                                {"X": 10.0, "Y": 10.0}, trials=200, seed=1)
+    assert out["trial_count"] == 200, out   # must not hang
+
+
+@suite.case
+def test_T3_simulator_is_pure():
+    import inspect
+    from agent import risk_simulator as S
+    src = inspect.getsource(S)
+    for forbidden in ("import pandas", "read_csv", "agent.tools", "streamlit", "anthropic"):
+        assert forbidden not in src, f"simulator core must not contain {forbidden!r}"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))
