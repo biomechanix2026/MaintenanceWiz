@@ -40,6 +40,7 @@ TOOL_FUNCS = {
     "delay_history_tool": lambda a: T.delay_history_tool(a["asset_id"]),
     "risk_score_tool": lambda a: T.risk_score_tool(a["asset_id"]),
     "cascade_tool": lambda a: T.cascade_tool(a["asset_id"]),
+    "shift_plan_tool": lambda a: T.shift_plan_tool(),
     "alert_dispatch_tool": lambda a: T.alert_dispatch_tool(
         a["asset_id"], a["risk_level"], a["summary"], a.get("recipients"),
         role=a.get("role"), dry_run=a.get("dry_run", not _ALERTS_LIVE)),
@@ -81,6 +82,9 @@ TOOL_SCHEMAS = [
     {"name": "cascade_tool",
      "description": "Plant-level cascade impact for an asset: downstream assets idled by its failure, blast radius, and system_priority (own priority escalated by downstream criticality). Call after risk_score_tool to express plant bottleneck impact.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}}, "required": ["asset_id"]}},
+    {"name": "shift_plan_tool",
+     "description": "Propose the next-shift action queue for the whole plant: ranks flagged assets by system_priority (cascade-aware), allocates finite crew-hours per skill, defers what does not fit (with reasons), and diverts parts-infeasible jobs to monitored degradation + procurement. Use for plant-scope questions like 'what should we do this shift?' - takes no arguments.",
+     "input_schema": {"type": "object", "properties": {}}},
     {"name": "alert_dispatch_tool", "description": "Dispatch a real-time, role-routed alert for a high-risk asset. Omit recipients to auto-route by severity (critical->supervisor, high->reliability, else maintenance); or pass role (maintenance|reliability|supervisor) or an explicit recipients string.",
      "input_schema": {"type": "object", "properties": {"asset_id": {"type": "string"}, "risk_level": {"type": "string"}, "summary": {"type": "string"}, "recipients": {"type": "string"}, "role": {"type": "string"}}, "required": ["asset_id", "risk_level", "summary"]}},
     {"name": "task_closure_tool", "description": "Check the compliance checklist for a work order; blocks closure if items missing.",
