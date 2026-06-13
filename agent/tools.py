@@ -560,7 +560,7 @@ def work_order_draft_tool(persist: bool = False, out_dir: str | None = None) -> 
                    "qty_on_hand": p["qty_on_hand"], "lead_time_days": p["lead_time_days"]}
                   for p in inv.get("parts", [])]
         work_orders.append({
-            "work_order_id": f"WO-{aid}-{stamp:%Y%m%d}",
+            "work_order_id": f"WO-{aid}-{stamp:%Y%m%d_%H%M%S_%f}",
             "status": "DRAFT",
             "asset_id": aid,
             "asset_name": name_of.get(aid, aid),
@@ -584,7 +584,7 @@ def work_order_draft_tool(persist: bool = False, out_dir: str | None = None) -> 
             },
             "approval": {"required": True, "approved": False,
                          "note": "Draft only - requires engineer approval; no autonomous closure."},
-            "generated_at": stamp.isoformat(timespec="seconds"),
+            "generated_at": stamp.isoformat(timespec="microseconds"),
         })
 
     persisted = []

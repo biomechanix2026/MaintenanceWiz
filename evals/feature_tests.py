@@ -214,6 +214,10 @@ def test_W3_persist_writes_one_json_per_wo():
         assert len(files) == out["count"] > 0, (len(files), out["count"])
         rec = _json.load(open(files[0], encoding="utf-8"))
         assert rec["status"] == "DRAFT" and rec["work_order_id"], rec
+        again = work_order_draft_tool(persist=True, out_dir=d)
+        files_after_second_run = _glob.glob(_os.path.join(d, "*.json"))
+        assert len(files_after_second_run) == out["count"] + again["count"], (
+            len(files_after_second_run), out["count"], again["count"])
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
