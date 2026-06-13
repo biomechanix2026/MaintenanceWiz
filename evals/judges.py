@@ -60,6 +60,24 @@ CASES = [
         "expect_constraint_flag": False,
         "expect_tool_called": "risk_score_tool",
     },
+    {
+        "name": "gearbox-cascade-impact",
+        "query": "what's wrong with the mill gearbox?",
+        "expect_asset": "GEARBOX-05",
+        "expect_band_in": {"CRITICAL", "HIGH"},
+        "expect_constraint_flag": True,
+        "expect_tool_called": "cascade_tool",
+        "expect_downstream_min": 1,          # GEARBOX-05 idles the rolling mills
+    },
+    {
+        "name": "leaf-asset-terminal",
+        "query": "status of the cold roll stand",
+        "expect_asset": "ROLL-MILL-11",
+        "expect_band_in": {"LOW", "MEDIUM"},
+        "expect_constraint_flag": False,
+        "expect_tool_called": "cascade_tool",
+        "expect_terminal": True,             # last asset in the flow: no dependents
+    },
 ]
 
 
@@ -67,6 +85,7 @@ def judge(case):
     res = run_deterministic(case["query"])
     risk = res.structured.get("risk", {})
     abnormality = res.structured.get("abnormality", {})
+    cascade = res.structured.get("cascade", {})
     tools_called = {t["tool"] for t in res.trace}
     checks = {
         "asset_resolved": res.asset_id == case["expect_asset"],
@@ -84,6 +103,15 @@ def judge(case):
     if "expect_catastrophic_risk" in case:
         checks["catastrophic_risk"] = (
             bool(abnormality.get("catastrophic_risk")) == case["expect_catastrophic_risk"])
+    if "expect_downstream_min" in case:
+        checks["downstream_count"] = (
+            cascade.get("downstream_count", -1) >= case["expect_downstream_min"])
+        checks["system_priority_escalated"] = (
+            cascade.get("system_priority", -1) >= risk.get("priority_score", 101))
+    if case.get("expect_terminal"):
+        checks["terminal_no_downstream"] = cascade.get("downstream_count", -1) == 0
+        checks["system_equals_own"] = (
+            cascade.get("system_priority") == risk.get("priority_score"))
     return all(checks.values()), checks, res
 
 
