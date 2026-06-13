@@ -1,0 +1,5 @@
+crew_id,name,skill,shift_hours
+CREW-MECH-A,Mechanical Crew A,mechanical,8
+CREW-MECH-B,Mechanical Crew B,mechanical,8
+CREW-HYD,Hydraulic Crew,hydraulic,8
+CREW-ELEC,Electrical Crew,electrical,8

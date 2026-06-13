@@ -157,6 +157,34 @@ PARTS = [
 ]
 
 # --------------------------------------------------------------------------
+# 6b. Next-shift planner contracts (crew roster + job templates).
+# Hard-coded literals (NO random calls) so regenerating leaves every existing
+# CSV byte-identical. Skills: mechanical | hydraulic | electrical.
+# Capacity is intentionally tight (mechanical 16h, hydraulic 8h, electrical 8h)
+# so the planner must defer lower-priority work — the operating-process payoff.
+# --------------------------------------------------------------------------
+CREW = [
+    # crew_id,        name,                  skill,        shift_hours
+    ("CREW-MECH-A",   "Mechanical Crew A",   "mechanical", 8),
+    ("CREW-MECH-B",   "Mechanical Crew B",   "mechanical", 8),
+    ("CREW-HYD",      "Hydraulic Crew",      "hydraulic",  8),
+    ("CREW-ELEC",     "Electrical Crew",     "electrical", 8),
+]
+
+# One typical corrective job per asset type: (task, est_hours, required_skill).
+JOB_TEMPLATES = [
+    # asset_type,  task,                                 est_hours, required_skill
+    ("furnace",    "Electrode clamp service",            4.0, "electrical"),
+    ("conveyor",   "Drive bearing inspection/replace",   3.0, "mechanical"),
+    ("pump",       "Mechanical seal service",            3.5, "mechanical"),
+    ("valve",      "Proportional valve spool service",   2.5, "hydraulic"),
+    ("mill",       "Work roll change",                   5.0, "mechanical"),
+    ("gearbox",    "Pinion inspection/replace",          4.0, "mechanical"),
+    ("compressor", "Compressor service",                 3.0, "mechanical"),
+    ("crane",      "Crane electrical inspection",        2.0, "electrical"),
+]
+
+# --------------------------------------------------------------------------
 # 7. Per-asset manuals / SOPs (the RAG corpus, asset-tagged markdown)
 # --------------------------------------------------------------------------
 MANUALS = {
@@ -413,6 +441,18 @@ def main():
                     "reorder_point", "lead_time_days", "unit_cost_usd"])
         for p in PARTS:
             w.writerow(list(p))
+
+    # 6b. Planner contracts (crew roster + job templates) - no random calls
+    with open(os.path.join(HERE, "crew_roster.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["crew_id", "name", "skill", "shift_hours"])
+        for c in CREW:
+            w.writerow(list(c))
+    with open(os.path.join(HERE, "job_templates.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["asset_type", "task", "est_hours", "required_skill"])
+        for j in JOB_TEMPLATES:
+            w.writerow(list(j))
 
     # 7. Per-asset manuals / SOPs
     for aid in ASSET_IDS:
