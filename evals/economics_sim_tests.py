@@ -281,5 +281,25 @@ def test_T5_structured_from_trace_parity():
     assert s.get("cost", {}).get("emv", {}).get("expected_value_preserved_usd") == 123.0, s
 
 
+# ---- T6: planner/WO carry averted_usd without changing allocation ----------
+@suite.case
+def test_T6_planner_annotates_averted_usd():
+    from agent.tools import shift_plan_tool
+    plan = shift_plan_tool()
+    for r in plan["scheduled"]:
+        assert "averted_usd" in r, "scheduled rows must carry averted_usd"
+    # allocation order/keys preserved (additive only)
+    assert "basis" in plan and "capacity" in plan, plan.keys()
+
+
+@suite.case
+def test_T6_planner_sort_unchanged():
+    # system_priority remains the primary sort key (annotation must not reorder)
+    from agent.tools import shift_plan_tool
+    plan = shift_plan_tool()
+    sps = [r["system_priority"] for r in plan["scheduled"]]
+    assert sps == sorted(sps, reverse=True), sps
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

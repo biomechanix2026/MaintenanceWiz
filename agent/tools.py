@@ -526,6 +526,12 @@ def shift_plan_tool() -> dict:
                  for _, r in jt.iterrows()}
     plan = planner.plan_shift(candidates, crew, templates)
     plan["candidate_count"] = len(candidates)
+    # Additive $ annotation only: estimated value preserved by each scheduled
+    # repair. Does NOT touch allocation order (still system_priority-driven).
+    for r in plan.get("scheduled", []):
+        c = cost_tool(r["asset_id"])
+        r["averted_usd"] = (c["emv"]["expected_value_preserved_usd"]
+                            if "error" not in c else None)
     return plan
 
 
@@ -581,6 +587,7 @@ def work_order_draft_tool(persist: bool = False, out_dir: str | None = None) -> 
                             "path_str": casc.get("path_str")},
                 "spares": spares,
                 "sop_citations": sop_citations,
+                "economics": cost_tool(aid).get("emv"),
             },
             "approval": {"required": True, "approved": False,
                          "note": "Draft only - requires engineer approval; no autonomous closure."},
