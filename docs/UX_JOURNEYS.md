@@ -220,12 +220,16 @@ NL), 6.4 (audit trail).
    the SQL used to summarize downtime.
 4. **🔜 What does it idle downstream?** — `cascade_tool` adds system priority
    and topology impact, linking an asset risk to the line it can idle.
-5. **🔜 What if we defer 48h? + KPI row for the standup** — `scenario_tool` and
-   `kpi_summary` turn the decision into a management row instead of a debate.
+5. **🔜 What should we run this shift?** — `shift_plan_tool` allocates the
+   flagged work to crews under crew-hour + spares constraints, deferring what
+   doesn't fit and diverting parts-infeasible jobs to procurement: a next-shift
+   plan, not a debate.
 
-*🔜 = approved tranche, plan committed
-(`docs/superpowers/plans/2026-06-12-cascade-scenario-kpi.md`), not yet merged.
-Delete these tags when it lands.*
+*🔜 = backend tools merged on `codex/plant-cascade` (`cascade_tool`,
+`shift_plan_tool`; design in `docs/superpowers/plans/2026-06-13-next-shift-planner-mvp.md`).
+The dashboard surfacing is pending the frontend rewrite on `codex/mw2-port`;
+delete these tags when the UI lands. (`scenario_tool` + `kpi_summary` are a
+separate deferred "explain & manage" tranche.)*
 
 ### What to notice (judges)
 

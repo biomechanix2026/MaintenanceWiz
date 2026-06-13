@@ -18,7 +18,7 @@ every compliance step is logged.
 
 Live demo (slim serverless build, Gemini 2.5 Flash free tier):
 **https://maintenancewiz.vercel.app** — see `web/`. It exposes 10 of the
-12 tools over a precomputed prognostics snapshot, BM25 retrieval and
+14 tools over a precomputed prognostics snapshot, BM25 retrieval and
 bundled read-only SQLite, all exported from the real implementation by
 `scripts/build_demo_assets.py`. The full build (Claude tool-use loop +
 deterministic fallback) runs locally per the instructions below.
@@ -169,7 +169,7 @@ knowledge/
   rag.py                  asset-filtered hybrid RAG (ChromaDB/TF-IDF + BM25)
 agent/
   system_prompt.py        the Consolidated-Brain system prompt
-  tools.py                the 12-tool suite (structured outputs)
+  tools.py                the 14-tool suite (structured outputs)
   orchestrator.py         think→act→observe loop (LLM + deterministic)
 app/streamlit_app.py      5-panel dashboard
 scripts/pre_shift_run.py  autonomous pre-shift briefing (cron-friendly)
