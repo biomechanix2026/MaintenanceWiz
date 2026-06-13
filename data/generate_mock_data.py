@@ -154,6 +154,8 @@ PARTS = [
     ("CPLG-19",    "PUMP-19",      "Elastomeric coupling element",     5, 2, 6,  180),
     ("ELEC-CLMP1", "FURNACE-01",   "Electrode clamp contact pad",      6, 3, 14, 540),
     ("FILT-10MIC", "HYD-VALVE-07", "10-micron hydraulic filter",       8, 4, 3,  85),
+    ("COMP-SVC09", "COMPRESSOR-09","Compressor service kit",           2, 1, 10, 1150),
+    ("CRANE-CONT6","CRANE-06",     "Crane contactor inspection kit",   1, 1, 12, 780),
 ]
 
 # --------------------------------------------------------------------------
@@ -171,17 +173,21 @@ CREW = [
     ("CREW-ELEC",     "Electrical Crew",     "electrical", 8),
 ]
 
-# One typical corrective job per asset type: (task, est_hours, required_skill).
+# One typical corrective job per asset type: (task, est_hours, required_skill,
+# primary_part_no). primary_part_no is the LIMITING part the job consumes - an
+# explicit mapping, never inferred from longest lead time or stock status. It is
+# an exemplar part_no that exists in PARTS; per-asset resolution (and the
+# unresolved case) is handled in the tool layer.
 JOB_TEMPLATES = [
-    # asset_type,  task,                                 est_hours, required_skill
-    ("furnace",    "Electrode clamp service",            4.0, "electrical"),
-    ("conveyor",   "Drive bearing inspection/replace",   3.0, "mechanical"),
-    ("pump",       "Mechanical seal service",            3.5, "mechanical"),
-    ("valve",      "Proportional valve spool service",   2.5, "hydraulic"),
-    ("mill",       "Work roll change",                   5.0, "mechanical"),
-    ("gearbox",    "Pinion inspection/replace",          4.0, "mechanical"),
-    ("compressor", "Compressor service",                 3.0, "mechanical"),
-    ("crane",      "Crane electrical inspection",        2.0, "electrical"),
+    # asset_type,  task,                                 est_hours, required_skill, primary_part_no
+    ("furnace",    "Electrode clamp service",            4.0, "electrical", "ELEC-CLMP1"),
+    ("conveyor",   "Drive bearing inspection/replace",   3.0, "mechanical", "BRG-6314"),
+    ("pump",       "Mechanical seal service",            3.5, "mechanical", "SEAL-CART-12"),
+    ("valve",      "Proportional valve spool service",   2.5, "hydraulic",  "SPOOL-HV7"),
+    ("mill",       "Work roll change",                   5.0, "mechanical", "ROLL-WR4"),
+    ("gearbox",    "Pinion inspection/replace",          4.0, "mechanical", "PINION-G5"),
+    ("compressor", "Compressor service",                 3.0, "mechanical", "COMP-SVC09"),
+    ("crane",      "Crane electrical inspection",        2.0, "electrical", "CRANE-CONT6"),
 ]
 
 # --------------------------------------------------------------------------
@@ -450,7 +456,7 @@ def main():
             w.writerow(list(c))
     with open(os.path.join(HERE, "job_templates.csv"), "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["asset_type", "task", "est_hours", "required_skill"])
+        w.writerow(["asset_type", "task", "est_hours", "required_skill", "primary_part_no"])
         for j in JOB_TEMPLATES:
             w.writerow(list(j))
 
