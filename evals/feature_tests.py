@@ -165,5 +165,65 @@ def test_P5_planner_no_crew_overbooked():
         assert info["used"] <= info["total"], (cid, info)
 
 
+# ===========================================================================
+# CMMS work-order drafts (system-of-action write-back)
+# ===========================================================================
+@suite.case
+def test_W1_work_orders_only_for_scheduled_jobs():
+    from agent.tools import work_order_draft_tool, shift_plan_tool
+    plan = shift_plan_tool()
+    out = work_order_draft_tool()
+    wo_assets = {w["asset_id"] for w in out["work_orders"]}
+    sched_assets = {s["asset_id"] for s in plan["scheduled"]}
+    assert wo_assets == sched_assets, (wo_assets, sched_assets)
+    assert out["count"] == len(plan["scheduled"]), out["count"]
+    # no WO for procurement-blocked or deferred jobs
+    blocked = ({p["asset_id"] for p in plan["procurement"]}
+               | {d["asset_id"] for d in plan["deferred"]})
+    assert wo_assets.isdisjoint(blocked), (wo_assets, blocked)
+    # GEARBOX-05 is procurement-blocked in the demo data -> never a WO
+    assert "GEARBOX-05" not in wo_assets, wo_assets
+
+
+@suite.case
+def test_W2_every_work_order_carries_trace_evidence():
+    from agent.tools import work_order_draft_tool
+    out = work_order_draft_tool()
+    assert out["work_orders"], "expected at least one scheduled WO"
+    for w in out["work_orders"]:
+        assert w["status"] == "DRAFT", w
+        assert w["approval"]["required"] is True and w["approval"]["approved"] is False, w
+        assert w["crew_id"] and w["planned_hours"] > 0, w
+        ev = w["evidence"]
+        assert ev["risk"]["priority_score"] is not None and ev["risk"]["priority_band"], ev
+        assert ev["cascade"]["system_priority"] is not None, ev
+        assert isinstance(ev["spares"], list), ev
+        assert isinstance(ev["sop_citations"], list), ev
+
+
+@suite.case
+def test_W3_persist_writes_one_json_per_wo():
+    import os as _os, json as _json, glob as _glob, tempfile, shutil
+    from agent.tools import work_order_draft_tool
+    d = tempfile.mkdtemp(prefix="mw_wo_")
+    try:
+        dry = work_order_draft_tool(persist=False, out_dir=d)
+        assert dry["persisted"] == [] and _glob.glob(_os.path.join(d, "*.json")) == []
+        out = work_order_draft_tool(persist=True, out_dir=d)
+        files = _glob.glob(_os.path.join(d, "*.json"))
+        assert len(files) == out["count"] > 0, (len(files), out["count"])
+        rec = _json.load(open(files[0], encoding="utf-8"))
+        assert rec["status"] == "DRAFT" and rec["work_order_id"], rec
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@suite.case
+def test_W4_work_order_draft_tool_in_both_registries():
+    from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
+    assert "work_order_draft_tool" in TOOL_FUNCS, "missing from TOOL_FUNCS"
+    assert any(s["name"] == "work_order_draft_tool" for s in TOOL_SCHEMAS), "missing from TOOL_SCHEMAS"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

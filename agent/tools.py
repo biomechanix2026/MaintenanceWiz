@@ -530,6 +530,81 @@ def shift_plan_tool() -> dict:
 
 
 # ==========================================================================
+# TOOL 7.7: CMMS draft work orders (system of action - draft write-back)
+# ==========================================================================
+def work_order_draft_tool(persist: bool = False, out_dir: str | None = None) -> dict:
+    """Draft one trace-backed work order per SCHEDULED next-shift job. Composes
+    shift_plan_tool with per-asset evidence (risk, cascade, spares, SOP
+    citations, crew + planned hours). Approval-gated: every WO is a DRAFT and is
+    never auto-closed. Parts-infeasible / deferred jobs get NO work order - they
+    stay procurement / monitored-degradation actions.
+
+    persist=False (default) is side-effect-free; persist=True writes one JSON per
+    WO to out_dir (default config.WORK_ORDERS_DIR) - opt-in, like alert dispatch.
+    """
+    plan = shift_plan_tool()
+    reg = _registry()
+    name_of = dict(zip(reg.asset_id, reg.name))
+    stamp = datetime.now()
+
+    work_orders = []
+    for job in plan.get("scheduled", []):
+        aid = job["asset_id"]
+        risk = risk_score_tool(aid)
+        casc = cascade_tool(aid)
+        inv = inventory_tool(aid)
+        rag = rag_tool(f"isolation repair procedure {job.get('task', '')}", asset_id=aid, k=3)
+        sop_citations = [h["source"] for h in rag.get("results", [])
+                         if str(h.get("type", "")).lower() == "manual"]
+        spares = [{"part_no": p["part_no"], "status": p["status"],
+                   "qty_on_hand": p["qty_on_hand"], "lead_time_days": p["lead_time_days"]}
+                  for p in inv.get("parts", [])]
+        work_orders.append({
+            "work_order_id": f"WO-{aid}-{stamp:%Y%m%d}",
+            "status": "DRAFT",
+            "asset_id": aid,
+            "asset_name": name_of.get(aid, aid),
+            "task": job.get("task"),
+            "crew_id": job.get("crew_id"),
+            "planned_hours": job.get("est_hours"),
+            "system_priority": job.get("system_priority"),
+            "priority_band": risk.get("priority_band"),
+            "rul_days": risk.get("rul_days"),
+            "evidence": {
+                "risk": {"priority_score": risk.get("priority_score"),
+                         "priority_band": risk.get("priority_band"),
+                         "constraint_flag": risk.get("constraint_flag"),
+                         "components": risk.get("components")},
+                "cascade": {"system_priority": casc.get("system_priority"),
+                            "blast_radius": casc.get("blast_radius"),
+                            "downstream_count": casc.get("downstream_count"),
+                            "path_str": casc.get("path_str")},
+                "spares": spares,
+                "sop_citations": sop_citations,
+            },
+            "approval": {"required": True, "approved": False,
+                         "note": "Draft only - requires engineer approval; no autonomous closure."},
+            "generated_at": stamp.isoformat(timespec="seconds"),
+        })
+
+    persisted = []
+    if persist:
+        target = out_dir or C.WORK_ORDERS_DIR
+        os.makedirs(target, exist_ok=True)
+        for w in work_orders:
+            path = os.path.join(target, f"{w['work_order_id']}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(w, f, indent=2)
+            persisted.append(path)
+
+    return {"work_orders": work_orders, "count": len(work_orders),
+            "persisted": persisted,
+            "basis": ("One DRAFT work order per scheduled next-shift job; "
+                      "parts-infeasible / deferred jobs get none. Approval-gated; "
+                      "no autonomous closure.")}
+
+
+# ==========================================================================
 # TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def _role_for_band(risk_level: str) -> str:
