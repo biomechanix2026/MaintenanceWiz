@@ -20,7 +20,8 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
 from agent.tools import (risk_score_tool, prognostic_tool, abnormality_tool,
-                         inventory_tool, alert_dispatch_tool, shift_plan_tool)
+                         inventory_tool, alert_dispatch_tool, shift_plan_tool,
+                         work_order_draft_tool)
 from config import ALERT_THRESHOLD
 
 REPORTS_DIR = os.path.join(C.ROOT, "reports")
@@ -109,6 +110,18 @@ def run():
     if plan["procurement"]:
         lines += ["", "**Procurement / monitored degradation (part infeasible this shift):**"]
         lines += [f"- {p['asset_id']} — {p['reason']}" for p in plan["procurement"]]
+    lines.append("")
+
+    # Draft trace-backed work orders for the scheduled jobs (system of action).
+    # Persist under the report dir so a scheduled run leaves draft WO artifacts;
+    # approval-gated (DRAFT only, no autonomous closure).
+    wo = work_order_draft_tool(persist=True, out_dir=os.path.join(REPORTS_DIR, "work_orders"))
+    lines += ["## Drafted work orders (CMMS - draft, approval-gated)",
+              f"*{wo['count']} draft WO(s) written to reports/work_orders/; "
+              f"each carries risk + cascade + SOP + spares + crew evidence.*", ""]
+    lines += [f"- `{w['work_order_id']}` — {w['asset_id']} {w['task']} → {w['crew_id']} "
+              f"({w['planned_hours']}h); SOP: {', '.join(w['evidence']['sop_citations'][:1]) or 'n/a'}"
+              for w in wo["work_orders"]]
     lines.append("")
 
     path = os.path.join(REPORTS_DIR, f"preshift_{ts:%Y%m%d_%H%M}.md")

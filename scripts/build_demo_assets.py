@@ -5,12 +5,13 @@ Everything is exported from the real tool suite (agent.orchestrator.TOOL_SCHEMAS
 agent.tools.*, knowledge.rag.build_chunks) so the hosted demo cannot drift from
 the local implementation.
 
-The hosted demo exposes 10 of the 14 tools. Excluded:
-- fault_mode_tool  (needs the optional sklearn fault_model.pkl artifact)
-- feedback_tool    (persists to CSV + reindexes; writes don't survive a
-                    stateless serverless instance)
-- cascade_tool     (reads config.py topology; the demo bundles no config.py)
-- shift_plan_tool  (plant-wide scan over config + live tools; not snapshot-friendly)
+The hosted demo exposes 10 of the 15 tools. Excluded:
+- fault_mode_tool        (needs the optional sklearn fault_model.pkl artifact)
+- feedback_tool          (persists to CSV + reindexes; writes don't survive a
+                          stateless serverless instance)
+- cascade_tool           (reads config.py topology; the demo bundles no config.py)
+- shift_plan_tool        (plant-wide scan over config + live tools; not snapshot-friendly)
+- work_order_draft_tool  (composes shift_plan_tool + writes draft artifacts; out of scope for the demo)
 alert_dispatch_tool is exported but the serverless core forces dry_run.
 
 Run:  python -m scripts.build_demo_assets              # full export
@@ -33,7 +34,8 @@ from agent.tools import prognostic_tool, abnormality_tool, risk_score_tool
 from knowledge.rag import build_chunks
 
 WEB_DATA = os.path.join(C.ROOT, "web", "data")
-EXCLUDED_TOOLS = {"fault_mode_tool", "feedback_tool", "cascade_tool", "shift_plan_tool"}
+EXCLUDED_TOOLS = {"fault_mode_tool", "feedback_tool", "cascade_tool",
+                  "shift_plan_tool", "work_order_draft_tool"}
 
 DEMO_NOTE = """
 

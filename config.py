@@ -128,3 +128,7 @@ CASCADE_GAIN = 3.0     # blast-radius units -> system_priority points
 # --------------------------------------------------------------------------
 CREW_ROSTER_CSV = os.path.join(DATA_DIR, "crew_roster.csv")
 JOB_TEMPLATES_CSV = os.path.join(DATA_DIR, "job_templates.csv")
+
+# Mock CMMS: draft work orders are written here (opt-in artifact, like alerts/
+# pre-shift reports). Drafts only - never an autonomous closure.
+WORK_ORDERS_DIR = os.path.join(ROOT, "reports", "work_orders")

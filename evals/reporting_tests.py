@@ -61,6 +61,9 @@ def test_OUT15_preshift_report():
         # next-shift planner: the briefing ends with an allocated plan, not just a list
         assert "Next shift plan" in md, "no next-shift plan section"
         assert ("Deferred" in md or "Procurement" in md), "plan has no deferral/procurement reasons"
+        # CMMS: scheduled jobs become trace-backed draft work orders
+        assert "Drafted work orders (CMMS" in md, "no CMMS work-order section"
+        assert "reports/work_orders/" in md, "WO artifacts location not reported"
 
 
 # ---- EO-05: out-of-stock long-lead parts surfaced + alter plan ------------
