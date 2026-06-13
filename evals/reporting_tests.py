@@ -58,6 +58,9 @@ def test_OUT15_preshift_report():
         assert "RUL" in md and "abnormality" in md.lower(), "missing RUL/abnormality detail"
         assert "Drafted WO" in md, "no drafted work order"
         assert "GEARBOX-05" in md, "EO-01: known high-risk asset absent from pre-shift queue"
+        # next-shift planner: the briefing ends with an allocated plan, not just a list
+        assert "Next shift plan" in md, "no next-shift plan section"
+        assert ("Deferred" in md or "Procurement" in md), "plan has no deferral/procurement reasons"
 
 
 # ---- EO-05: out-of-stock long-lead parts surfaced + alter plan ------------
