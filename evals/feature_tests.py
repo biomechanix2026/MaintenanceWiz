@@ -52,5 +52,35 @@ def test_C2_downstream_and_blast_radius():
     assert blast_u == 0.0 and path_u == [], "unknown asset must be terminal"
 
 
+# ---- C3: cascade_tool contract ---------------------------------------------
+@suite.case
+def test_C3_cascade_tool_contract():
+    from agent.tools import cascade_tool, risk_score_tool
+    out = cascade_tool("GEARBOX-05")
+    own = risk_score_tool("GEARBOX-05")["priority_score"]
+    assert out["own_priority"] == own, out
+    assert out["downstream_count"] == 2 and len(out["downstream"]) == 2, out
+    assert out["blast_radius"] == 4.44, out
+    assert out["blast_points"] == round(4.44 * 3.0, 1), out
+    assert out["system_priority"] == round(min(100.0, own + out["blast_points"]), 1), out
+    assert out["path_str"] == "GEARBOX-05 -> ROLL-MILL-04 -> ROLL-MILL-11", out
+    # terminal asset: system priority equals own priority
+    leaf = cascade_tool("ROLL-MILL-11")
+    assert leaf["downstream_count"] == 0, leaf
+    assert leaf["system_priority"] == leaf["own_priority"], leaf
+    assert leaf["path_str"] == "ROLL-MILL-11", leaf
+    # unknown asset -> error dict, no crash
+    bad = cascade_tool("NO-SUCH-ASSET")
+    assert "error" in bad, bad
+
+
+# ---- C4: cascade_tool registered in BOTH registries ------------------------
+@suite.case
+def test_C4_cascade_tool_in_both_registries():
+    from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
+    assert "cascade_tool" in TOOL_FUNCS, "missing from TOOL_FUNCS"
+    assert any(s["name"] == "cascade_tool" for s in TOOL_SCHEMAS), "missing from TOOL_SCHEMAS"
+
+
 if __name__ == "__main__":
     raise SystemExit(run_suites(suite))

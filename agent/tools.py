@@ -458,6 +458,35 @@ def risk_score_tool(asset_id: str) -> dict:
 
 
 # ==========================================================================
+# TOOL 7.5: Plant cascade impact (bottleneck prioritization at plant level)
+# ==========================================================================
+def cascade_tool(asset_id: str) -> dict:
+    """Plant-level impact of this asset failing: which downstream assets idle,
+    the criticality-weighted blast radius, and a system_priority that escalates
+    own priority by cascade impact. Additive by design - priority_score and
+    RISK_WEIGHTS are untouched (eval-baseline safe).
+    """
+    from agent import cascade
+    own_res = risk_score_tool(asset_id)
+    if "error" in own_res:
+        return {"asset_id": asset_id, "error": own_res["error"]}
+    own = own_res["priority_score"]
+    blast, path = cascade.blast_radius(asset_id)
+    blast_points = round(C.CASCADE_GAIN * blast, 1)
+    system_priority = round(min(100.0, own + blast_points), 1)
+    return {
+        "asset_id": asset_id,
+        "own_priority": own,
+        "blast_radius": round(blast, 2),
+        "blast_points": blast_points,
+        "system_priority": system_priority,
+        "downstream": path,                      # [{asset_id, name, hops, criticality}]
+        "downstream_count": len(path),
+        "path_str": " -> ".join([asset_id] + [d["asset_id"] for d in path]),
+    }
+
+
+# ==========================================================================
 # TOOL 8: Real-time alert dispatch (logs to notifications; mock SMTP)
 # ==========================================================================
 def _role_for_band(risk_level: str) -> str:
