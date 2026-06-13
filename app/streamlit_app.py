@@ -24,10 +24,11 @@ import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C
-from app import theme as TH, components as UI
+from app import theme as TH, components as UI, cascade_ui as CUI
 from agent import tools as T
+from agent.cascade import build_graph
 from agent.orchestrator import run_agent
-from agent.tools import (risk_score_tool, prognostic_tool, inventory_tool,
+from agent.tools import (risk_score_tool, cascade_tool, prognostic_tool, inventory_tool,
                          abnormality_tool, delay_history_tool, rag_tool, resolve_asset,
                          task_closure_tool, append_logbook, record_feedback,
                          learned_bias, CLOSURE_ITEMS)
@@ -135,6 +136,7 @@ def plant_scan():
     for _, a in reg.iterrows():
         r = risk_score_tool(a["asset_id"])
         abn = abnormality_tool(a["asset_id"])
+        casc = cascade_tool(a["asset_id"])
         constraint_flag = r.get("constraint_flag")
         rows.append({
             "asset_id": a["asset_id"], "name": a["name"], "line": a["line"],
@@ -142,6 +144,9 @@ def plant_scan():
             "band": r["priority_band"], "priority_band": r["priority_band"],
             "rul_days": r["rul_days"], "anomaly_status": abn["status"],
             "anomaly_score": abn["anomaly_score"],
+            # cascade: additive plant-impact signal (existing ranking unchanged)
+            "system_priority": casc.get("system_priority", r["priority_score"]),
+            "downstream_n": casc.get("downstream_count", 0),
             "constraint_flag": constraint_flag,
             "constraint": "⚠️" if constraint_flag else "",
         })
@@ -167,6 +172,8 @@ def _wallboard_card_html(row) -> str:
     band = str(row.get("priority_band", row.get("band", "LOW"))).upper()
     anomaly = str(row.get("anomaly_status", "NORMAL")).upper()
     score = int(round(float(row.get("priority_score", 0) or 0)))
+    system_priority = float(row.get("system_priority", score) or score)
+    downstream_n = int(round(float(row.get("downstream_n", 0) or 0)))
     constraint_html = ""
     if row.get("constraint_flag"):
         constraint_html = f"<div style='margin-top:.7rem'>{TH.constraint_chip()}</div>"
@@ -180,6 +187,8 @@ def _wallboard_card_html(row) -> str:
         <div style="margin-top:.85rem;font-size:1.05rem;font-weight:800">{TH.esc(asset_id)} · {TH.esc(name)} · {TH.esc(line)}</div>
         <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
           <span class="mw-mono">RUL {TH.esc(_fmt_rul(row.get("rul_days")))}</span>
+          <span class="mw-mono">SYS {system_priority:.0f}/100</span>
+          <span class="mw-mono">DOWN {downstream_n}</span>
           {TH.anomaly_chip(anomaly)}
         </div>
         {constraint_html}
@@ -286,7 +295,8 @@ def _render_asset_grid(df: pd.DataFrame):
 def _render_density_view(df: pd.DataFrame):
     columns = [
         "asset_id", "name", "type", "line", "criticality", "priority_score",
-        "band", "rul_days", "anomaly_status", "anomaly_score", "constraint",
+        "system_priority", "downstream_n", "band", "rul_days", "anomaly_status",
+        "anomaly_score", "constraint",
     ]
     table = df[columns].rename(columns={
         "asset_id": "Asset",
@@ -295,6 +305,8 @@ def _render_density_view(df: pd.DataFrame):
         "line": "Line",
         "criticality": "Criticality",
         "priority_score": "Priority",
+        "system_priority": "System Priority",
+        "downstream_n": "Downstream",
         "band": "Band",
         "rul_days": "RUL (d)",
         "anomaly_status": "Anomaly",
@@ -302,6 +314,50 @@ def _render_density_view(df: pd.DataFrame):
         "constraint": "Flag",
     })
     st.dataframe(table, hide_index=True, use_container_width=True)
+
+
+def _render_topology_graph(df: pd.DataFrame):
+    st.markdown("**Plant topology — cascade flow**")
+    st.caption("Node color = current priority band. Node label includes system priority; ranking still uses priority score.")
+    try:
+        dot = CUI.build_topology_dot(df.to_dict("records"), build_graph())
+        st.graphviz_chart(dot, use_container_width=True)
+    except Exception as exc:
+        st.info(f"Topology graph unavailable ({type(exc).__name__}); use the density table as fallback.")
+
+
+def _render_next_shift_plan():
+    st.markdown("**Next shift plan**")
+    with st.spinner("Allocating flagged work under crew-hour and spares constraints..."):
+        plan = T.shift_plan_tool()
+    if plan.get("error"):
+        st.error(plan["error"])
+        return
+
+    scheduled = CUI.plan_bucket_rows(plan, "scheduled")
+    deferred = CUI.plan_bucket_rows(plan, "deferred")
+    procurement = CUI.plan_bucket_rows(plan, "procurement")
+
+    st.caption(CUI.capacity_summary(plan.get("capacity", {})))
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("**Scheduled**")
+        if scheduled:
+            st.dataframe(pd.DataFrame(scheduled), hide_index=True, use_container_width=True)
+        else:
+            st.caption("No jobs scheduled.")
+    with c2:
+        st.markdown("**Deferred**")
+        if deferred:
+            st.dataframe(pd.DataFrame(deferred), hide_index=True, use_container_width=True)
+        else:
+            st.caption("No capacity deferrals.")
+    with c3:
+        st.markdown("**Procurement / monitored degradation**")
+        if procurement:
+            st.dataframe(pd.DataFrame(procurement), hide_index=True, use_container_width=True)
+        else:
+            st.caption("No spares-blocked jobs.")
 
 
 if st.query_params.get("wallboard") == "1":
@@ -351,6 +407,12 @@ if view == UI.VIEWS[0]:
                "in time; the agent switches to a monitored-degradation strategy. "
                "Anomaly is an independent sensor-deviation early-warning signal.")
 
+    st.markdown("---")
+    _render_topology_graph(df)
+
+    st.markdown("---")
+    _render_next_shift_plan()
+
     with st.expander("Engineer density view"):
         _render_density_view(filtered)
 
@@ -368,6 +430,7 @@ if view == UI.VIEWS[1]:
     prog = prognostic_tool(aid)
     abn = abnormality_tool(aid)
     risk = risk_score_tool(aid)
+    casc = cascade_tool(aid)
 
     constraint_html = ""
     if risk.get("constraint_flag"):
@@ -405,6 +468,15 @@ if view == UI.VIEWS[1]:
         """,
         unsafe_allow_html=True,
     )
+
+    st.markdown("**Downstream blast radius**")
+    if casc.get("downstream_count", 0):
+        st.caption(f"System priority {casc['system_priority']}/100 "
+                   f"(own {casc['own_priority']} + cascade {casc['blast_points']}); "
+                   f"path: {casc['path_str']}")
+        st.dataframe(pd.DataFrame(casc["downstream"]), hide_index=True, use_container_width=True)
+    else:
+        st.info("Terminal asset - no downstream dependents.")
 
     st.markdown("**Live sensor evidence**")
     UI.sensor_tiles(aid, arow["type"])

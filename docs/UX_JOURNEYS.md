@@ -218,18 +218,19 @@ NL), 6.4 (audit trail).
 3. **She clicks one number she doesn't believe** — *Asset Deep-Dive*: the
    evidence room shows sensor deviations in σ, SHAP drivers, parts status, and
    the SQL used to summarize downtime.
-4. **🔜 What does it idle downstream?** — `cascade_tool` adds system priority
-   and topology impact, linking an asset risk to the line it can idle.
-5. **🔜 What should we run this shift?** — `shift_plan_tool` allocates the
-   flagged work to crews under crew-hour + spares constraints, deferring what
-   doesn't fit and diverting parts-infeasible jobs to procurement: a next-shift
-   plan, not a debate.
+4. **What does it idle downstream?** — `cascade_tool` adds system priority and
+   topology impact, linking an asset risk to the line it can idle. *Plant
+   Bottleneck* shows the cascade topology graph and `SYS`/`DOWN` on each card;
+   *Asset Deep-Dive* shows the downstream blast-radius panel.
+5. **What should we run this shift?** — `shift_plan_tool` allocates the flagged
+   work to crews under crew-hour + spares constraints, deferring what doesn't
+   fit and diverting parts-infeasible jobs to procurement: a next-shift plan,
+   not a debate. Surfaced as the *Next shift plan* panel on *Plant Bottleneck*.
 
-*🔜 = backend tools merged on `codex/plant-cascade` (`cascade_tool`,
-`shift_plan_tool`; design in `docs/superpowers/plans/2026-06-13-next-shift-planner-mvp.md`).
-The dashboard surfacing is pending the frontend rewrite on `codex/mw2-port`;
-delete these tags when the UI lands. (`scenario_tool` + `kpi_summary` are a
-separate deferred "explain & manage" tranche.)*
+*Backend tools merged on `codex/plant-cascade`; dashboard surfaces landed on
+`codex/cascade-ui` (`cascade_tool`, `shift_plan_tool`; design in
+`docs/superpowers/plans/2026-06-13-next-shift-planner-mvp.md`). `scenario_tool`
++ `kpi_summary` remain a separate deferred "explain & manage" tranche.*
 
 ### What to notice (judges)
 
