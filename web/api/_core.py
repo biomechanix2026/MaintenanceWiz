@@ -7,9 +7,10 @@ Differences from the full local build (agent/orchestrator.py + agent/tools.py):
   (web/data/snapshot.json) exported by scripts/build_demo_assets.py.
 - Retrieval is BM25-only over the exported chunk file; BM25Index is copied
   verbatim from knowledge/rag.py (pure stdlib - no extra dependency).
-- fault_mode_tool, feedback_tool, cascade_tool and shift_plan_tool are not
-  deployed (config/model/scan dependencies the slim build doesn't bundle);
-  alert_dispatch_tool is forced dry-run (no side effects on a stateless instance).
+- fault_mode_tool, feedback_tool, cascade_tool, shift_plan_tool and
+  work_order_draft_tool are not deployed (config/model/scan/write dependencies
+  the slim build doesn't bundle); alert_dispatch_tool is forced dry-run (no side
+  effects on a stateless instance).
 - SQLite is opened read-only on the bundled file (no writes are needed).
 - Stateless: the client sends full message history each request and gets the
   updated history back (google-genai Content dicts).

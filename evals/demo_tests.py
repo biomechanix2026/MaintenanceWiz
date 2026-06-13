@@ -34,10 +34,10 @@ def test_demo_tools_subset_and_gemini_format():
     from agent.orchestrator import TOOL_FUNCS, TOOL_SCHEMAS
     tools = demo_tools()
     names = {t["name"] for t in tools}
-    assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool",
-                              "cascade_tool", "shift_plan_tool"}
+    assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool", "cascade_tool",
+                              "shift_plan_tool", "work_order_draft_tool"}
     assert names.isdisjoint(EXCLUDED_TOOLS)
-    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 14
+    assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 15
     assert names <= set(TOOL_FUNCS)            # every exported tool is real
     for t in tools:                            # Gemini format, not Anthropic
         assert "parameters" in t and "input_schema" not in t
