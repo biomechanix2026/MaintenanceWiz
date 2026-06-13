@@ -175,6 +175,8 @@ def asset_card(row, *, full_width=False):
     line = _row_value(row, "line", "Line", default="Unknown line")
     band = str(_row_value(row, "priority_band", "band", "Band", default="LOW")).upper()
     score = int(round(_to_float(_row_value(row, "priority_score", "Priority", "score", default=0))))
+    system_priority = _row_value(row, "system_priority", "System Priority", default=None)
+    downstream_n = int(round(_to_float(_row_value(row, "downstream_n", "Downstream", default=0))))
     rul_days = _row_value(row, "rul_days", "RUL (d)", "rul", default=None)
     anomaly = str(_row_value(row, "anomaly_status", "Anomaly", "status", default="NORMAL")).upper()
     constraint = _row_value(row, "constraint_flag", "constraint", "Flag", default="")
@@ -194,6 +196,8 @@ def asset_card(row, *, full_width=False):
           <div style="margin-top:.85rem;font-size:1.05rem;font-weight:800">{TH.esc(asset_id)} · {TH.esc(name)} · {TH.esc(line)}</div>
           <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
             <span class="mw-mono">RUL {TH.esc(rul_text)}</span>
+            <span class="mw-mono">SYS {TH.esc(_fmt_number(system_priority))}/100</span>
+            <span class="mw-mono">DOWN {downstream_n}</span>
             {TH.anomaly_chip(anomaly)}
           </div>
           {constraint_html}
