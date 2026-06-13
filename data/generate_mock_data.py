@@ -424,6 +424,19 @@ def main():
         with open(os.path.join(MANUALS_DIR, f"{aid}.md"), "w") as f:
             f.write(f"# {title}\n\n*Asset ID: {aid}*\n{body}")
 
+    # 8. Plant topology (inspection-only artifact; logic always reads config.py).
+    # Local import + after all CSV writes: build_graph reads asset_registry.csv,
+    # and this makes no random calls so existing CSVs stay byte-identical.
+    from agent.cascade import build_graph
+    g = build_graph()
+    topo = {
+        "nodes": [{"asset_id": aid, "name": name, "type": typ, "line": line,
+                   "criticality": crit} for aid, name, typ, line, crit in ASSETS],
+        "edges": [{"src": s, "dst": d} for s in sorted(g) for d in g[s]],
+    }
+    with open(os.path.join(HERE, "plant_topology.json"), "w") as f:
+        json.dump(topo, f, indent=2)
+
     print("Mock data generated:")
     for fn in ["asset_registry.csv", "aliases.json", "sensor_logs.csv", "delay_logs.csv",
                "incident_records.csv", "spare_parts_inventory.csv"]:
