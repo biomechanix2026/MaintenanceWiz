@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a pure direct-cost economics core and a seeded Independent-Cascade Monte-Carlo simulator, surfaced via `cost_tool` + `risk_simulator_tool`, that express plant risk as estimated expected monetary value preserved by feasible next-shift actions.
+**Goal:** Add a pure direct-cost economics core and a seeded Independent-Cascade Monte-Carlo simulator, surfaced via `cost_tool` + `risk_simulator_tool`, that express plant risk as estimated value preserved by feasible repair-now actions and value at risk for procurement/monitoring actions.
 
 **Architecture:** Two new pure cores (`agent/economics.py`, `agent/risk_simulator.py`) with no `agent.tools`/pandas/IO imports, composed by two thin tools in `agent/tools.py` and dispatched identically in both orchestrator modes. Cascade-cost composition and feasibility gating live in the tool layer; the cores take normalized inputs only. Dollars fold additively into the five-block render Blocks 1 & 4 and annotate planner/WO output without changing allocation order.
 
@@ -19,21 +19,21 @@
 | `config.py` | New cost/sim constants (single source of truth) |
 | `data/job_templates.csv` | New `primary_part_no` column |
 | `data/generate_mock_data.py` | Emit `primary_part_no` deterministically |
-| `agent/economics.py` | NEW — pure direct-cost primitives (no IO, no cascade) |
-| `agent/risk_simulator.py` | NEW — pure Independent-Cascade Monte-Carlo with common random numbers |
+| `agent/economics.py` | NEW - pure direct-cost primitives (no IO, no cascade) |
+| `agent/risk_simulator.py` | NEW - pure Independent-Cascade Monte-Carlo with common random numbers |
 | `agent/tools.py` | `cost_tool`, `risk_simulator_tool`; planner/WO `averted_usd` annotations |
 | `agent/orchestrator.py` | Register both tools; dispatch `cost_tool`; structured parity both paths; render dollar lines |
 | `agent/system_prompt.py` | Instruct LLM mode to use cost/sim tools, tool-grounded only |
 | `app/streamlit_app.py` | Plant-risk panel |
 | `scripts/pre_shift_run.py` | Value-preserved summary line |
 | `scripts/build_demo_assets.py` | Exclude both tools from hosted demo |
-| `evals/economics_sim_tests.py` | NEW — unit + feasibility tests for cores/tools |
+| `evals/economics_sim_tests.py` | NEW - unit + feasibility tests for cores/tools |
 | `evals/feature_tests.py` / `tool_contract_tests.py` | Registry + contract assertions |
 
 Conventions to follow (verified in repo):
 - Eval suites use `from evals._harness import Suite, run_suites` (plus `approx`, `sandbox`), `@suite.case` on `def test_<ID>():`, and end with `if __name__ == "__main__": raise SystemExit(run_suites(suite))`. No pytest.
 - `prognostic_tool(asset_id)` returns `{"rul_days": float, "failure_probability_30d": float, ...}`.
-- `agent.cascade.build_graph()` returns `{node: [downstream_nodes]}`; edge `u→v` means u's failure impacts v; it is a DAG. `agent.cascade.downstream(asset_id)` returns `[(node, hops)]`.
+- `agent.cascade.build_graph()` returns `{node: [downstream_nodes]}`; edge `u->v` means u's failure impacts v; it is a DAG. `agent.cascade.downstream(asset_id)` returns `[(node, hops)]`.
 - `agent.planner.plan_shift(...)` returns `{"scheduled":[...], "deferred":[...], "procurement":[...], "capacity":{...}, "basis":str}`.
 - `config.CASCADE_DECAY == 0.6`, `config.MAX_RUL_DAYS == 120`.
 
@@ -99,7 +99,7 @@ Expected: FAIL on `config missing TONNAGE_MARGIN_USD_PER_TON` (and/or missing co
 Append to `config.py` after the `CASCADE_GAIN` line (~124):
 
 ```python
-# --- Financial cost engine + risk simulator (DEMO ECONOMICS — not plant-sourced) ---
+# --- Financial cost engine + risk simulator (DEMO ECONOMICS - not plant-sourced) ---
 DOWNTIME_COST_USD_PER_HOUR = {     # $/hr of lost production by asset type
     "furnace": 120000, "conveyor": 18000, "pump": 22000, "valve": 16000,
     "mill": 90000, "gearbox": 65000, "compressor": 30000, "crane": 25000,
@@ -122,7 +122,33 @@ CASCADE_EDGE_PROBABILITY_CAP = 0.85
 
 - [ ] **Step 4: Add `primary_part_no` to the data and generator**
 
-In `data/generate_mock_data.py`, find the dict/rows that build `job_templates.csv` (search `job_templates` / `required_skill`). Add a `primary_part_no` to each row, mapping each asset_type's job to its limiting part. Use the existing per-asset part numbers (verified present): gearbox→`PINION-G5`, valve→`SPOOL-HV7`. For the remaining types, map to that type's primary wear part already emitted into `spare_parts_inventory.csv` (read the generator's parts block and pick the highest-lead / lowest-stock part per type). Concretely, after building the templates list, ensure the written CSV header is:
+In `data/generate_mock_data.py`, find the dict/rows that build `job_templates.csv` (search
+`job_templates` / `required_skill`). Add a `primary_part_no` to each row using this explicit
+limiting-part mapping; do not infer from longest lead time or stock status:
+
+```python
+JOB_TEMPLATES = [
+    # asset_type,  task,                                 est_hours, required_skill, primary_part_no
+    ("furnace",    "Electrode clamp service",            4.0, "electrical", "ELEC-CLMP1"),
+    ("conveyor",   "Drive bearing inspection/replace",   3.0, "mechanical", "BRG-6314"),
+    ("pump",       "Mechanical seal service",            3.5, "mechanical", "SEAL-CART-12"),
+    ("valve",      "Proportional valve spool service",   2.5, "hydraulic",  "SPOOL-HV7"),
+    ("mill",       "Work roll change",                   5.0, "mechanical", "ROLL-WR4"),
+    ("gearbox",    "Pinion inspection/replace",          4.0, "mechanical", "PINION-G5"),
+    ("compressor", "Compressor service",                 3.0, "mechanical", "COMP-SVC09"),
+    ("crane",      "Crane electrical inspection",        2.0, "electrical", "CRANE-CONT6"),
+]
+```
+
+Add matching inventory rows for the two asset types that currently have a job template but no
+primary part in `spare_parts_inventory.csv`:
+
+```python
+("COMP-SVC09",   "COMPRESSOR-09", "Compressor service kit",           2, 1, 10, 1150),
+("CRANE-CONT6", "CRANE-06",      "Crane contactor inspection kit",   1, 1, 12, 780),
+```
+
+Then ensure the written CSV header is:
 
 ```text
 asset_type,task,est_hours,required_skill,primary_part_no
@@ -150,7 +176,7 @@ git commit -m "feat(economics): config cost/sim constants + job_templates primar
 
 ---
 
-## Task 2: `agent/economics.py` — pure direct-cost core
+## Task 2: `agent/economics.py` - pure direct-cost core
 
 **Files:**
 - Create: `agent/economics.py`
@@ -224,7 +250,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'agent.economics'`.
 Pure direct-cost economics primitives for Maintenance Wizard.
 
 Computes per-event and per-action dollar primitives ONLY. No pandas, no file IO,
-no RAG, no inventory lookup, and NO cascade composition — cascade cost is composed
+no RAG, no inventory lookup, and NO cascade composition - cascade cost is composed
 by the caller (cost_tool / risk_simulator) which holds the graph. This keeps the
 core individually testable with synthetic scalars.
 
@@ -238,7 +264,7 @@ def direct_event_cost(*, asset_type: str,
                       tonnage_lost_per_event: float,
                       downtime_cost_usd_per_hour: float,
                       tonnage_margin_usd_per_ton: float) -> dict:
-    """Direct cost of ONE failure event. Inputs are PER-EVENT — callers must divide
+    """Direct cost of ONE failure event. Inputs are PER-EVENT - callers must divide
     aggregate delay history by event count before calling. Labelled a proxy."""
     downtime_usd = (downtime_min_per_event / 60.0) * downtime_cost_usd_per_hour
     tonnage_usd = tonnage_lost_per_event * tonnage_margin_usd_per_ton
@@ -304,7 +330,7 @@ git commit -m "feat(economics): pure direct-cost core (direct_event_cost, planne
 
 ---
 
-## Task 3: `agent/risk_simulator.py` — Independent-Cascade Monte-Carlo with common random numbers
+## Task 3: `agent/risk_simulator.py` - Independent-Cascade Monte-Carlo with common random numbers
 
 **Files:**
 - Create: `agent/risk_simulator.py`
@@ -335,6 +361,7 @@ def test_T3_baseline_reproducible_and_banded():
     # E[loss] = 100 + 100*0.6 + 100*0.36 = 196
     approx(a["mean_eml_usd"], 188.0, 204.0)
     assert a["trial_count"] == 4000 and a["seed"] == 42, a
+    assert set(a["loss_contributions"]) == set(nodes), a["loss_contributions"]
 
 
 @suite.case
@@ -369,6 +396,20 @@ def test_T3_ranking_and_no_suppress_actions():
     assert ranked[0]["asset_id"] == "A", ranked
     b = [r for r in ranked if r["asset_id"] == "B"][0]
     assert b["gross_averted_eml_usd"] == 0.0, b
+
+
+@suite.case
+def test_T3_procurement_does_not_suppress_current_shift():
+    from agent import risk_simulator as S
+    nodes, edges, cost = _chain_fixture()
+    ranked = S.rank_interventions(
+        nodes, edges, {"A": 1.0, "B": 0.0, "C": 0.0}, cost,
+        candidates=[{"asset_id": "A", "action": "procure_for_window",
+                     "intervention_cost_usd": 0.0}],
+        trials=1000, seed=42)
+    p = ranked[0]
+    assert p["gross_averted_eml_usd"] == 0.0, p
+    assert p["net_averted_eml_usd"] == 0.0, p
 
 
 @suite.case
@@ -473,6 +514,7 @@ def simulate_plant_risk(nodes, edges, seed_probs, node_cost, *, trials, seed,
     active = _activations(order, idx, incoming, edge_p, seed_p, U_seed, U_edge)
     losses = active @ cost
     contrib = active.mean(axis=0) * cost
+    contrib_map = {order[k]: round(float(contrib[k]), 2) for k in range(len(order))}
     top = sorted(
         ({"asset_id": order[k], "mean_loss_contribution_usd": round(float(contrib[k]), 2)}
          for k in range(len(order))),
@@ -484,6 +526,7 @@ def simulate_plant_risk(nodes, edges, seed_probs, node_cost, *, trials, seed,
         "p95_eml_usd": round(float(np.percentile(losses, 95)), 2),
         "trial_count": int(trials),
         "seed": int(seed),
+        "loss_contributions": contrib_map,
         "top_contributors": top,
     }
 
@@ -491,7 +534,9 @@ def simulate_plant_risk(nodes, edges, seed_probs, node_cost, *, trials, seed,
 def rank_interventions(nodes, edges, seed_probs, node_cost, candidates, *,
                        trials, seed, edge_floor=0.05, edge_cap=0.85) -> list:
     """Each candidate: {asset_id, action, intervention_cost_usd, ...passthrough}.
-    Actions 'monitor'/'defer_capacity' apply NO suppression (averted == 0)."""
+    Only 'repair_now' suppresses spontaneous failure this shift. Actions
+    'procure_for_window'/'monitor'/'defer_capacity' apply NO suppression
+    (averted == 0); procurement value is reported as value-at-risk elsewhere."""
     order, idx, incoming, edge_p = _prep(nodes, edges, edge_floor, edge_cap)
     U_seed, U_edge = _draws(order, edges, seed, trials)     # common random numbers
     base_seed_p = np.array([seed_probs.get(n, 0.0) for n in order])
@@ -501,7 +546,7 @@ def rank_interventions(nodes, edges, seed_probs, node_cost, candidates, *,
 
     out = []
     for c in candidates:
-        if c.get("action") in ("monitor", "defer_capacity") or c["asset_id"] not in idx:
+        if c.get("action") != "repair_now" or c["asset_id"] not in idx:
             averted = 0.0
         else:
             sp = base_seed_p.copy()
@@ -569,15 +614,30 @@ def test_T4_cost_tool_shape_and_proxy():
 
 
 @suite.case
-def test_T4_parts_blocked_asset_is_monitor_never_repair_now():
-    # HYD-VALVE-07's primary part SPOOL-HV7 is out of stock with an 18d lead.
+def test_T4_mixed_stock_uses_job_primary_part():
+    # GEARBOX-05 has PINION-G5 out of stock and OIL-VG320 in stock. The in-stock
+    # oil must not make the pinion replacement job repairable.
     from agent.tools import cost_tool, prognostic_tool
-    out = cost_tool("HYD-VALVE-07")
+    gb = cost_tool("GEARBOX-05")
+    assert gb["planned_job"]["primary_part_no"] == "PINION-G5", gb
+    assert gb["feasibility"]["action"] != "repair_now", gb["feasibility"]
+
+    hv = cost_tool("HYD-VALVE-07")
+    assert hv["planned_job"]["primary_part_no"] == "SPOOL-HV7", hv
     rul = prognostic_tool("HYD-VALVE-07")["rul_days"]
-    lead = out["feasibility"].get("lead_time_days")
-    if lead is not None and lead >= rul:
-        assert out["feasibility"]["action"] == "monitor", out["feasibility"]
-        assert out["feasibility"]["action"] != "repair_now"
+    expected = "procure_for_window" if 18 < rul else "monitor"
+    assert hv["feasibility"]["action"] == expected, (rul, hv["feasibility"])
+
+
+@suite.case
+def test_T4_unresolved_primary_part_is_not_repairable():
+    # LADLE-02 is a furnace-type asset but has no ELEC-CLMP1 inventory row. The
+    # resolver must not substitute another asset's furnace part or longest-lead part.
+    from agent.tools import cost_tool
+    out = cost_tool("LADLE-02")
+    assert out["primary_part_unresolved"] is True, out
+    assert out["planned_job"]["primary_part_no"] is None, out["planned_job"]
+    assert out["feasibility"]["action"] in {"monitor", "defer_capacity"}, out["feasibility"]
 
 
 @suite.case
@@ -589,11 +649,18 @@ def test_T4_risk_simulator_tool_buckets_and_distribution():
               "trial_count", "seed"):
         assert k in sim, sim
     # no deferred-bucket asset may be prescribed repair_now
+    procure_seen = False
     for p in out["prescriptions"]:
         if p.get("planner_bucket") == "deferred":
             assert p["action"] == "defer_capacity", p
         if p["action"] == "procure_for_window":
+            procure_seen = True
             assert p["lead_time_days"] < p["predicted_rul_days"], p
+            assert p["gross_averted_eml_usd"] == 0.0, p
+            assert p["net_averted_eml_usd"] == 0.0, p
+            assert p["value_at_risk_usd"] is not None, p
+            assert "planned_action_cost_usd" in p, p
+    assert procure_seen, "expected at least one procure_for_window candidate in demo data"
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -611,23 +678,30 @@ Add near the other tools (after `work_order_draft_tool`, before the orchestrator
 # ==========================================================================
 def _primary_part(asset_id: str, asset_type: str) -> dict | None:
     """Resolve the limiting part for the asset's templated job via job_templates'
-    primary_part_no, matched into this asset's inventory rows. Falls back to the
-    asset's longest-lead part if the template part is not stocked for this asset."""
+    primary_part_no, matched into this asset's own inventory rows by exact part_no.
+    Never substitute a different physical part."""
     jt = pd.read_csv(C.JOB_TEMPLATES_CSV)
     row = jt[jt.asset_type == asset_type]
-    inv = inventory_tool(asset_id)["parts"]
-    if row.empty or not inv:
-        return None
-    want = str(row.iloc[0]["primary_part_no"])
+    if row.empty or "primary_part_no" not in jt.columns:
+        return {"unresolved": True, "primary_part_no": None,
+                "reason": "no job template primary_part_no"}
+    want_raw = row.iloc[0].get("primary_part_no")
+    if pd.isna(want_raw) or not str(want_raw).strip():
+        return {"unresolved": True, "primary_part_no": None,
+                "reason": "blank job template primary_part_no"}
+    want = str(want_raw).strip()
+    inv = inventory_tool(asset_id).get("parts", [])
     match = next((p for p in inv if p["part_no"] == want), None)
-    if match is None:                      # asset-type fallback: longest-lead part
-        match = max(inv, key=lambda p: p["lead_time_days"])
-    return match
+    if match is None:
+        return {"unresolved": True, "primary_part_no": want,
+                "reason": "primary part not stocked for this asset; mapping unresolved"}
+    return {**match, "unresolved": False, "primary_part_no": want}
 
 
 def cost_tool(asset_id: str) -> dict:
     """Estimated expected event-cost proxy, feasible action, and EMV for one asset.
     All dollar figures derive from tool outputs + config economics (never invented)."""
+    from agent import cascade, economics
     reg = _registry()
     row = reg[reg.asset_id == asset_id]
     if row.empty:
@@ -675,14 +749,20 @@ def cost_tool(asset_id: str) -> dict:
     jt = pd.read_csv(C.JOB_TEMPLATES_CSV)
     trow = jt[jt.asset_type == atype]
     est_hours = float(trow.iloc[0]["est_hours"]) if not trow.empty else 3.0
+    task = str(trow.iloc[0]["task"]) if not trow.empty else "Inspect asset"
     part = _primary_part(asset_id, atype)
-    part_no = part["part_no"] if part else None
-    part_cost = float(part["unit_cost_usd"]) if part else 0.0
-    in_stock = bool(part and part["qty_on_hand"] > 0)
-    lead = int(part["lead_time_days"]) if part else None
+    unresolved = bool(part and part.get("unresolved"))
+    template_part_no = part.get("primary_part_no") if part else None
+    part_no = None if unresolved else (part["part_no"] if part else None)
+    part_cost = 0.0 if unresolved or not part else float(part["unit_cost_usd"])
+    in_stock = bool(part and not unresolved and part["qty_on_hand"] > 0)
+    lead = int(part["lead_time_days"]) if part and not unresolved else None
 
     # feasibility action (planner-bucket anchoring is applied in risk_simulator_tool)
-    if in_stock:
+    if unresolved:
+        action, reason = "monitor", "primary part not stocked for this asset; mapping unresolved"
+        act_cost = 0.0
+    elif in_stock:
         action, reason = "repair_now", "primary part in stock"
         act_cost = economics.planned_action_cost(
             planned_hours=est_hours, downtime_cost_usd_per_hour=rate,
@@ -708,7 +788,10 @@ def cost_tool(asset_id: str) -> dict:
             "total_usd": own["total_usd"],
         },
         "failure_cost_usd": round(failure_cost, 2),
-        "planned_job": {"primary_part_no": part_no, "est_hours": est_hours},
+        "primary_part_unresolved": unresolved,
+        "planned_job": {"task": task, "primary_part_no": part_no,
+                        "template_primary_part_no": template_part_no,
+                        "est_hours": est_hours},
         "feasibility": {"action": action, "reason": reason,
                         "lead_time_days": lead, "predicted_rul_days": round(rul, 1),
                         "in_stock": in_stock},
@@ -722,6 +805,7 @@ def cost_tool(asset_id: str) -> dict:
 def risk_simulator_tool(trials: int | None = None) -> dict:
     """Seeded plant-risk distribution and feasible-action prescription, anchored to
     the next-shift planner's buckets so prescriptions are crew- and parts-feasible."""
+    from agent import cascade, risk_simulator
     reg = _registry()
     g = cascade.build_graph()
     nodes = list(g.keys())
@@ -739,6 +823,7 @@ def risk_simulator_tool(trials: int | None = None) -> dict:
     n_trials = int(trials or C.SIMULATION_TRIALS)
     sim = risk_simulator.simulate_plant_risk(
         nodes, edges, seed_probs, node_cost, trials=n_trials, seed=C.SIMULATION_SEED)
+    loss_contrib = sim.get("loss_contributions", {})
 
     # planner buckets -> per-asset bucket label for feasibility anchoring
     plan = shift_plan_tool()
@@ -762,12 +847,17 @@ def risk_simulator_tool(trials: int | None = None) -> dict:
             action = "repair_now"
         else:
             action = feas if feas in ("procure_for_window", "monitor") else "monitor"
+        planned_action_cost = c["emv"]["action_cost_usd"]
+        current_shift_cost = planned_action_cost if action == "repair_now" else 0.0
         candidates.append({
             "asset_id": nid, "planner_bucket": b, "action": action,
             "primary_part_no": c["planned_job"]["primary_part_no"],
+            "primary_part_unresolved": c.get("primary_part_unresolved", False),
             "lead_time_days": c["feasibility"]["lead_time_days"],
             "predicted_rul_days": c["feasibility"]["predicted_rul_days"],
-            "intervention_cost_usd": c["emv"]["action_cost_usd"],
+            "intervention_cost_usd": current_shift_cost,
+            "planned_action_cost_usd": planned_action_cost,
+            "value_at_risk_usd": loss_contrib.get(nid, 0.0),
         })
 
     ranked = risk_simulator.rank_interventions(
@@ -780,11 +870,9 @@ def risk_simulator_tool(trials: int | None = None) -> dict:
             "prescriptions": ranked}
 ```
 
-At the top of `agent/tools.py`, ensure the cores are imported (add alongside the existing `from agent import cascade, planner` style import — verify the exact existing import line and extend it):
-
-```python
-from agent import economics, risk_simulator
-```
+The new tool functions use local imports (`from agent import cascade, economics` inside
+`cost_tool`; `from agent import cascade, risk_simulator` inside `risk_simulator_tool`) to match
+the existing `cascade_tool` pattern and keep every referenced module in scope.
 
 - [ ] **Step 4: Register both tools in `agent/orchestrator.py`**
 
@@ -811,7 +899,8 @@ In `TOOL_SCHEMAS`, add two schema dicts matching the existing style:
         "name": "risk_simulator_tool",
         "description": ("Seeded Monte-Carlo plant-risk distribution (expected monetary "
                         "loss percentile bands) and a ranked list of FEASIBLE next-shift "
-                        "actions by estimated value preserved. Plant-scope; no asset_id."),
+                        "actions. repair_now rows report estimated value preserved; "
+                        "procurement/monitor rows report value at risk. Plant-scope; no asset_id."),
         "input_schema": {"type": "object",
                          "properties": {"trials": {"type": "integer"}},
                          "required": []},
@@ -821,7 +910,7 @@ In `TOOL_SCHEMAS`, add two schema dicts matching the existing style:
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `python -m evals.economics_sim_tests`
-Expected: all `T4-*` PASS. (If `risk_simulator_tool` is slow, lower `SIMULATION_TRIALS` is not needed — graph is small; it should be well under 1s.)
+Expected: all `T4-*` PASS. (If `risk_simulator_tool` is slow, lower `SIMULATION_TRIALS` is not needed - graph is small; it should be well under 1s.)
 
 - [ ] **Step 6: Commit**
 
@@ -849,13 +938,13 @@ Append to `evals/economics_sim_tests.py`:
 def test_T5_five_blocks_present_and_dollars_in_1_and_4():
     from agent.orchestrator import run_deterministic
     res = run_deterministic("Status of GEARBOX-05?")
-    text = res.answer
+    text = res.answer_markdown
     for h in ("### 1.", "### 2.", "### 3.", "### 4.", "### 5."):
         assert h in text, f"missing block header {h}"
     block1 = text.split("### 2.")[0]
     block4 = text.split("### 4.")[1].split("### 5.")[0]
     assert "$" in block1, "Block 1 must carry the expected event-cost proxy in $"
-    assert "$" in block4, "Block 4 must carry estimated value preserved in $"
+    assert "$" in block4, "Block 4 must carry estimated financial exposure/value in $"
 
 
 @suite.case
@@ -913,14 +1002,20 @@ and to Block 4 (recommendation):
 ```python
     if cost and "error" not in cost:
         v = cost["emv"]; f = cost["feasibility"]
-        block4_lines.append(
-            f"- Estimated value preserved by acting now (**{f['action']}**): "
-            f"~${v['expected_value_preserved_usd']:,.0f} "
-            f"(expected run-to-failure loss ~${v['expected_failure_loss_usd']:,.0f}). "
-            f"Counterfactual estimate under stated assumptions.")
+        if f["action"] == "repair_now":
+            block4_lines.append(
+                f"- Estimated value preserved by repair_now: "
+                f"~${v['expected_value_preserved_usd']:,.0f} "
+                f"(expected run-to-failure loss ~${v['expected_failure_loss_usd']:,.0f}). "
+                f"Counterfactual estimate under stated assumptions.")
+        else:
+            block4_lines.append(
+                f"- Estimated value at risk pending {f['action']}: "
+                f"~${v['expected_failure_loss_usd']:,.0f}; this is exposed risk, "
+                f"not value preserved this shift.")
 ```
 
-Adapt the exact variable names (`block1_lines`/`block4_lines`) to however `_render` accumulates each block — read the function and match its existing pattern; the requirement is one `$` line appended inside Block 1 and one inside Block 4, headers unchanged.
+Adapt the exact variable names (`block1_lines`/`block4_lines`) to however `_render` accumulates each block - read the function and match its existing pattern; the requirement is one `$` line appended inside Block 1 and one inside Block 4, headers unchanged.
 
 - [ ] **Step 4: Mirror cost into `_structured_from_trace`**
 
@@ -935,15 +1030,20 @@ In `_structured_from_trace` (~line 320), add cost extraction from the trace:
 
 (Match `out`/return-dict variable name used by the existing function.)
 
-- [ ] **Step 5: Update the system prompt**
+- [ ] **Step 5: Update the system prompt with a removable financial block**
 
-In `agent/system_prompt.py`, add a sentence to the tool-guidance/guardrail section:
+In `agent/system_prompt.py`, add a delimited step block after `STEP 4.5 PLANT IMPACT` and
+before `STEP 5 RECONCILE & OUTPUT`:
 
 ```text
-- For financial questions, call cost_tool (one asset) or risk_simulator_tool (plant-wide).
-  Report dollars ONLY from these tool outputs — never estimate or invent figures.
-  Say "estimated"/"expected value preserved"/"percentile bands"; never "exact" or "proven".
+STEP 4.7 FINANCIALS: for financial questions, call cost_tool (one asset) or
+risk_simulator_tool (plant-wide). Report dollars ONLY from these tool outputs.
+Say "estimated", "expected value preserved", "value at risk", and "percentile
+bands"; never "exact", "proven", or "confidence bands".
 ```
+
+Keep this as a distinct `STEP 4.7` block so the hosted demo builder can strip it when the
+hosted tool surface excludes `cost_tool` and `risk_simulator_tool`.
 
 - [ ] **Step 6: Run tests to verify they pass**
 
@@ -1014,7 +1114,7 @@ In `work_order_draft_tool` (`agent/tools.py`, ~line 535-589), inside the per-job
                 "economics": cost_tool(aid).get("emv"),
 ```
 
-(Use the loop's asset-id variable; match the existing evidence-dict indentation. Parts-blocked/deferred jobs already receive no draft WO — that invariant is untouched.)
+(Use the loop's asset-id variable; match the existing evidence-dict indentation. Parts-blocked/deferred jobs already receive no draft WO - that invariant is untouched.)
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -1042,19 +1142,30 @@ git commit -m "feat(tools): annotate planner + WO with averted_usd (allocation u
 - Modify: `app/streamlit_app.py`
 - Modify: `scripts/pre_shift_run.py`
 - Modify: `scripts/build_demo_assets.py`
-- Modify: `evals/tool_contract_tests.py` (or `evals/demo_tests.py`) for hosted exclusion
+- Modify: `evals/demo_tests.py` for hosted exclusion contract
 - Test: `evals/economics_sim_tests.py` (extend)
 
-- [ ] **Step 1: Write the failing test (hosted exclusion)**
+- [ ] **Step 1: Write the failing test (hosted exclusion + hosted prompt strip)**
 
 Append to `evals/economics_sim_tests.py`:
 
 ```python
 # ---- T7: hosted demo excludes the new tools --------------------------------
 @suite.case
-def test_T7_hosted_excludes_new_tools():
+def test_T7_hosted_excludes_new_tools_and_prompt():
     import json, os, config as C
-    path = os.path.join(C.BASE_DIR if hasattr(C, "BASE_DIR") else ".", "web", "data", "tools.json")
+    from scripts.build_demo_assets import demo_tools, hosted_system_prompt, EXCLUDED_TOOLS
+
+    assert {"cost_tool", "risk_simulator_tool"} <= EXCLUDED_TOOLS, EXCLUDED_TOOLS
+    names = {t.get("name") for t in demo_tools()}
+    assert "cost_tool" not in names, "hosted demo must exclude cost_tool"
+    assert "risk_simulator_tool" not in names, "hosted demo must exclude risk_simulator_tool"
+
+    hp = hosted_system_prompt()
+    assert "cost_tool" not in hp, "hosted prompt must not order cost_tool"
+    assert "risk_simulator_tool" not in hp, "hosted prompt must not order risk_simulator_tool"
+
+    path = os.path.join(C.ROOT, "web", "data", "tools.json")
     if not os.path.exists(path):
         from evals._harness import gap
         gap("web/data/tools.json not generated in this environment")
@@ -1066,15 +1177,87 @@ def test_T7_hosted_excludes_new_tools():
 - [ ] **Step 2: Run test to verify it fails (or GAPs)**
 
 Run: `python -m evals.economics_sim_tests`
-Expected: FAIL if `tools.json` lists the new tools; GAP if the file is absent locally.
+Expected: FAIL because `EXCLUDED_TOOLS` and `hosted_system_prompt()` do not yet exclude the
+new financial tools; GAP only for the generated `tools.json` file when absent locally.
 
-- [ ] **Step 3: Exclude both tools from the hosted build**
+- [ ] **Step 3: Exclude both tools from the hosted build and prompt**
 
-In `scripts/build_demo_assets.py`, find the exclusion list used for the existing local-only operational tools (search for `cascade_tool` / `work_order_draft_tool` / `shift_plan_tool` in an exclude set). Add `"cost_tool"` and `"risk_simulator_tool"` to that same set. Re-run the builder if the environment supports it:
+In `scripts/build_demo_assets.py`, update the docstring, `EXCLUDED_TOOLS`, `DEMO_NOTE`, and
+`hosted_system_prompt()`.
+
+The exclusion set becomes:
+
+```python
+EXCLUDED_TOOLS = {"fault_mode_tool", "feedback_tool", "cascade_tool",
+                  "shift_plan_tool", "work_order_draft_tool",
+                  "cost_tool", "risk_simulator_tool"}
+```
+
+Update the top docstring to say:
+
+```text
+The hosted demo exposes 10 of the 17 tools. Excluded:
+- fault_mode_tool        (needs the optional sklearn fault_model.pkl artifact)
+- feedback_tool          (persists to CSV + reindexes; writes don't survive a
+                          stateless serverless instance)
+- cascade_tool           (reads config.py topology; the demo bundles no config.py)
+- shift_plan_tool        (plant-wide scan over config + live tools; not snapshot-friendly)
+- work_order_draft_tool  (composes shift_plan_tool + writes draft artifacts; out of scope for the demo)
+- cost_tool              (local-only: reads config economics and composes live plant tools)
+- risk_simulator_tool    (local-only: composes plant topology, planner buckets and live risk tools)
+```
+
+Update `DEMO_NOTE` so the local-only sentence includes `cost_tool` and
+`risk_simulator_tool`.
+
+Generalize the prompt stripping:
+
+```python
+LOCAL_ONLY_STEP_PREFIXES = ("STEP 4.5", "STEP 4.7")
+
+
+def hosted_system_prompt() -> str:
+    """SYSTEM_PROMPT with local-only pipeline steps stripped, plus DEMO_NOTE."""
+    kept, skip = [], False
+    for ln in SYSTEM_PROMPT.splitlines():
+        stripped = ln.lstrip()
+        if any(stripped.startswith(prefix) for prefix in LOCAL_ONLY_STEP_PREFIXES):
+            skip = True
+            continue
+        if skip and stripped.startswith("STEP "):
+            skip = False
+        if skip:
+            continue
+        kept.append(ln)
+    return "\n".join(kept) + DEMO_NOTE
+```
+
+Re-run the builder if the environment supports it:
 
 Run: `python scripts/build_demo_assets.py` (skip if it requires network/keys; the exclusion-set edit is the binding change)
 
-- [ ] **Step 4: Add the Streamlit plant-risk panel**
+- [ ] **Step 4: Update `evals/demo_tests.py` hosted contract**
+
+Before editing, read the current working-tree version of `evals/demo_tests.py` because it may
+already contain unrelated uncommitted changes. Layer this exact contract update on top:
+
+```python
+assert EXCLUDED_TOOLS == {"fault_mode_tool", "feedback_tool", "cascade_tool",
+                          "shift_plan_tool", "work_order_draft_tool",
+                          "cost_tool", "risk_simulator_tool"}
+assert names.isdisjoint(EXCLUDED_TOOLS)
+assert len(tools) == len(TOOL_SCHEMAS) - len(EXCLUDED_TOOLS)  # 10 of 17
+```
+
+In the hosted prompt test, keep the existing `STEP 4.5` assertions and add:
+
+```python
+assert "STEP 4.7" not in hp, "STEP 4.7 financial block not stripped from hosted prompt"
+assert "cost_tool" not in hp, "hosted prompt still mentions cost_tool"
+assert "risk_simulator_tool" not in hp, "hosted prompt still mentions risk_simulator_tool"
+```
+
+- [ ] **Step 5: Add the Streamlit plant-risk panel**
 
 In `app/streamlit_app.py`, locate the Plant Bottleneck view (search `cascade` / `shift_plan`). Add a panel that calls `risk_simulator_tool()` and renders, with a table fallback (no hard new dependency):
 
@@ -1087,13 +1270,13 @@ In `app/streamlit_app.py`, locate the Plant Bottleneck view (search `cascade` / 
     st.write({"mean": f"${s['mean_eml_usd']:,.0f}", "p50": f"${s['p50_eml_usd']:,.0f}",
               "p90": f"${s['p90_eml_usd']:,.0f}", "p95": f"${s['p95_eml_usd']:,.0f}"})
     if sim["prescriptions"]:
-        st.markdown("**Highest-value feasible actions (estimated value preserved):**")
+        st.markdown("**Feasible actions (value preserved for repair; value at risk otherwise):**")
         st.dataframe(sim["prescriptions"])
 ```
 
 (Match the file's existing import of `risk_simulator_tool` from `agent.tools`; add it to the existing tools import.)
 
-- [ ] **Step 5: Add the pre-shift value-preserved summary**
+- [ ] **Step 6: Add the pre-shift value-preserved / value-at-risk summary**
 
 In `scripts/pre_shift_run.py`, where the briefing markdown is assembled, add:
 
@@ -1104,24 +1287,29 @@ In `scripts/pre_shift_run.py`, where the briefing markdown is assembled, add:
         f"- Estimated plant exposure: mean ~${sim['simulation']['mean_eml_usd']:,.0f} "
         f"(p90 ~${sim['simulation']['p90_eml_usd']:,.0f}).")
     if top:
-        lines.append(
-            f"- Top feasible action: **{top['action']}** on {top['asset_id']} "
-            f"(~${top['net_averted_eml_usd']:,.0f} estimated value preserved).")
+        if top["action"] == "repair_now":
+            lines.append(
+                f"- Top feasible action: **repair_now** on {top['asset_id']} "
+                f"(~${top['net_averted_eml_usd']:,.0f} estimated value preserved).")
+        else:
+            lines.append(
+                f"- Top feasible action: **{top['action']}** on {top['asset_id']} "
+                f"(~${top['value_at_risk_usd']:,.0f} estimated value at risk pending action).")
 ```
 
 (Match the briefing's existing line-accumulator variable and the `risk_simulator_tool` import.)
 
-- [ ] **Step 6: Run tests + regressions**
+- [ ] **Step 7: Run tests + regressions**
 
 Run: `python -m evals.economics_sim_tests`
 Run: `python -m evals.tool_contract_tests`
 Run: `python -m evals.demo_tests`
 Expected: `T7` PASS (or GAP if no `tools.json`); existing contract/demo suites still PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add app/streamlit_app.py scripts/pre_shift_run.py scripts/build_demo_assets.py web/data/tools.json evals/economics_sim_tests.py evals/tool_contract_tests.py
+git add app/streamlit_app.py scripts/pre_shift_run.py scripts/build_demo_assets.py web/data/tools.json evals/economics_sim_tests.py evals/demo_tests.py
 git commit -m "feat(ui): plant-risk panel + pre-shift value-preserved summary; exclude new tools from hosted demo"
 ```
 
@@ -1134,7 +1322,7 @@ git commit -m "feat(ui): plant-risk panel + pre-shift value-preserved summary; e
 
 - [ ] **Step 1: Wire the new suite into the aggregate run (if applicable)**
 
-Check whether `evals/judges.py` (or a top-level runner) imports/aggregates the per-feature suites. If it does, add `economics_sim_tests`. If suites are run individually (as `feature_tests` is), no change is needed — document the run command in the suite docstring (already present).
+Check whether `evals/judges.py` (or a top-level runner) imports/aggregates the per-feature suites. If it does, add `economics_sim_tests`. If suites are run individually (as `feature_tests` is), no change is needed - document the run command in the suite docstring (already present).
 
 - [ ] **Step 2: Run the full documented regression set**
 
@@ -1160,7 +1348,6 @@ git commit -m "test: include economics/simulator suite in regression set"
 
 ## Self-review notes (author checklist, completed)
 
-- **Spec coverage:** config constants (T1), job→part mapping (T1), pure economics direct-only (T2), simulator + CRN + suppression semantics + cycle guard (T3), both tools dual-registered (T4), feasibility gates + planner-bucket anchoring + parts-blocked→monitor (T4), Blocks 1&4 dollars + structured parity both paths (T5), planner/WO annotations without reordering (T6), dashboard + pre-shift + hosted exclusion (T7), language discipline (T5 prompt + render strings). Causal ML/ledger correctly absent (non-goals).
+- **Spec coverage:** config constants (T1), job->part mapping (T1), pure economics direct-only (T2), simulator + CRN + repair-only suppression semantics + cycle guard (T3), both tools dual-registered (T4), feasibility gates + planner-bucket anchoring + parts-blocked->monitor (T4), Blocks 1&4 dollars + structured parity both paths (T5), planner/WO annotations without reordering (T6), dashboard + pre-shift + hosted exclusion + hosted prompt strip (T7), language discipline (T5 prompt + render strings). Causal ML/ledger correctly absent (non-goals).
 - **Placeholder scan:** every code step shows real code; integration steps that depend on existing local variable names explicitly instruct "match the existing pattern" and state the binding requirement (e.g. one `$` line per block).
-- **Type consistency:** `cost_tool` returns `event_cost_proxy`/`failure_cost_usd`/`feasibility`/`emv`; consumed with those exact keys in T4/T5/T6/T7 and in `risk_simulator_tool`. `rank_interventions` emits `net_averted_eml_usd`/`gross_averted_eml_usd`, used consistently in T3 and the pre-shift line. Simulator percentile keys `mean/p50/p90/p95_eml_usd` consistent across core, tool, dashboard, pre-shift.
-```
+- **Type consistency:** `cost_tool` returns `event_cost_proxy`/`failure_cost_usd`/`primary_part_unresolved`/`feasibility`/`emv`; consumed with those exact keys in T4/T5/T6/T7 and in `risk_simulator_tool`. `rank_interventions` emits `net_averted_eml_usd`/`gross_averted_eml_usd`; `risk_simulator_tool` adds `planned_action_cost_usd` and `value_at_risk_usd` so non-repair rows are not labelled as value preserved. Simulator percentile keys `mean/p50/p90/p95_eml_usd` and `loss_contributions` are consistent across core, tool, dashboard, and pre-shift.
