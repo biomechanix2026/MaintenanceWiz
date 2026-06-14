@@ -27,8 +27,13 @@ from collections import Counter
 from contextlib import closing
 from pathlib import Path
 
-from google import genai
-from google.genai import errors, types
+try:
+    from google import genai
+    from google.genai import errors, types
+except ModuleNotFoundError:  # pure dashboard/tests can run without google-genai
+    genai = None
+    errors = None
+    types = None
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -52,6 +57,8 @@ ALERT_ROLES = {
     "reliability": "reliability-engineering@plant.local",
     "supervisor":  "shift-supervisor@plant.local",
 }
+
+SIGNATURE_ASSET_ID = "GEARBOX-05"
 
 _cache: dict = {}
 _hits: dict[str, list[float]] = {}
@@ -84,6 +91,135 @@ def _db() -> sqlite3.Connection:
     conn = sqlite3.connect(f"file:{DATA_DIR / 'maintenance.db'}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _all_assets() -> list[dict]:
+    with closing(_db()) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT asset_id, name, type, line, criticality FROM assets "
+            "ORDER BY asset_id").fetchall()]
+
+
+def _rows(table: str, asset_id: str) -> list[dict]:
+    with closing(_db()) as conn:
+        return [dict(r) for r in conn.execute(
+            f"SELECT * FROM {table} WHERE asset_id = ?", (asset_id,)).fetchall()]
+
+
+def _delay_summary(asset_id: str) -> dict:
+    return delay_history_tool(asset_id)
+
+
+def _incident_summary(asset_id: str, limit: int = 3) -> list[dict]:
+    with closing(_db()) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM incidents WHERE asset_id = ? ORDER BY date DESC LIMIT ?",
+            (asset_id, limit)).fetchall()]
+
+
+def _evidence_hits(asset_id: str, query: str = "isolation repair procedure") -> list[dict]:
+    return rag_tool(query, asset_id=asset_id, k=4).get("results", [])
+
+
+def _dashboard_asset(row: dict) -> dict:
+    aid = row["asset_id"]
+    prog = prognostic_tool(aid)
+    abn = abnormality_tool(aid)
+    risk = risk_score_tool(aid)
+    return {
+        **row,
+        "prognostic": prog,
+        "abnormality": abn,
+        "risk": risk,
+        "inventory": inventory_tool(aid),
+        "delay_summary": _delay_summary(aid),
+        "incidents": _incident_summary(aid),
+        "evidence": _evidence_hits(aid),
+    }
+
+
+def dashboard_payload() -> dict:
+    """Read-only dashboard payload for the hosted command-center clone."""
+    assets = [_dashboard_asset(row) for row in _all_assets()]
+    assets.sort(key=lambda a: (
+        -float(a.get("risk", {}).get("priority_score", 0) or 0),
+        a.get("asset_id", ""),
+    ))
+    critical = [a for a in assets if a.get("risk", {}).get("priority_band") == "CRITICAL"]
+    abnormal = [a for a in assets if a.get("abnormality", {}).get("status") != "NORMAL"]
+    constrained = [a for a in assets if a.get("risk", {}).get("constraint_flag")]
+    attention = [
+        a for a in assets
+        if a.get("risk", {}).get("priority_band") in ("CRITICAL", "HIGH")
+        or a.get("abnormality", {}).get("status") != "NORMAL"
+        or a.get("risk", {}).get("constraint_flag")
+    ]
+    signature = next((a for a in assets if a["asset_id"] == SIGNATURE_ASSET_ID), assets[0] if assets else {})
+    scenarios = [
+        {
+            "id": "constraint-flip",
+            "title": "The part that cannot arrive in time",
+            "asset_id": SIGNATURE_ASSET_ID,
+            "prompt": "What's wrong with the mill gearbox?",
+            "why": "Lead time exceeds RUL, so the recommendation flips to monitored degradation.",
+        },
+        {
+            "id": "fuzzy-valve",
+            "title": "Plant jargon resolution",
+            "asset_id": "HYD-VALVE-07",
+            "prompt": "That valve that keeps leaking on the caster",
+            "why": "Alias resolution happens before tool calls.",
+        },
+        {
+            "id": "offline-eaf",
+            "title": "Offline-capable answer",
+            "asset_id": "FURNACE-01",
+            "prompt": "Check the EAF",
+            "why": "The same data contracts work in deterministic mode.",
+        },
+    ]
+    return {
+        "generated": _snapshot().get("generated"),
+        "asset_count": len(assets),
+        "assets": assets,
+        "kpis": {
+            "critical": len(critical),
+            "high": sum(1 for a in assets if a.get("risk", {}).get("priority_band") == "HIGH"),
+            "abnormal": len(abnormal),
+            "constraint_flagged": len(constrained),
+            "value_at_risk_usd": round(sum(
+                float(a.get("risk", {}).get("averted_usd", 0) or 0) for a in assets), 2),
+        },
+        "pre_shift": {
+            "needs_attention": len(attention),
+            "critical": len(critical),
+            "abnormal": len(abnormal),
+            "constraint_flagged": len(constrained),
+            "assets": [
+                {
+                    "asset_id": a["asset_id"],
+                    "name": a.get("name"),
+                    "priority_band": a.get("risk", {}).get("priority_band"),
+                    "priority_score": a.get("risk", {}).get("priority_score"),
+                    "rul_days": a.get("risk", {}).get("rul_days"),
+                    "anomaly_status": a.get("abnormality", {}).get("status"),
+                    "constraint_flag": a.get("risk", {}).get("constraint_flag"),
+                    "value_at_risk_usd": a.get("risk", {}).get("averted_usd", 0),
+                }
+                for a in attention[:8]
+            ],
+        },
+        "signature_story": {
+            "asset_id": signature.get("asset_id"),
+            "risk": signature.get("risk"),
+            "prognostic": signature.get("prognostic"),
+            "abnormality": signature.get("abnormality"),
+            "inventory": signature.get("inventory"),
+            "evidence": signature.get("evidence"),
+        },
+        "scenarios": scenarios,
+        "mode_note": "Hosted demo dashboard is deterministic and read-only; chat may use Gemini.",
+    }
 
 
 def rate_limited(ip: str, now: float | None = None) -> bool:
@@ -290,6 +426,80 @@ def task_closure_tool(work_order_id: str, checklist: dict | None = None) -> dict
                         f"Closure BLOCKED. Outstanding: {', '.join(missing)}.")}
 
 
+def should_use_gearbox_fallback(message: str, history: list[dict] | None) -> bool:
+    """Fresh-turn-only fallback trigger for the signature demo path.
+
+    Uses the same asset resolver as the agent instead of brittle prompt strings,
+    and refuses multi-turn fallback so canned content never corrupts a Gemini
+    tool-call history.
+    """
+    if history:
+        return False
+    resolved = resolve_asset(message or "")
+    return resolved.get("asset_id") == SIGNATURE_ASSET_ID
+
+
+def gearbox_fallback_response(message: str) -> dict:
+    """Deterministic five-block response for the hosted signature demo."""
+    aid = SIGNATURE_ASSET_ID
+    prog = prognostic_tool(aid)
+    abn = abnormality_tool(aid)
+    risk = risk_score_tool(aid)
+    inv = inventory_tool(aid)
+    delays = delay_history_tool(aid)
+    hits = rag_tool("isolation repair procedure pinion vibration gearbox", asset_id=aid, k=4)["results"]
+    parts = inv.get("parts", [])
+    out_parts = [p for p in parts if int(p.get("qty_on_hand", 0)) <= 0]
+    limiting = max(out_parts or parts, key=lambda p: int(p.get("lead_time_days", 0)), default={})
+    shap = prog.get("shap", {})
+    drivers = ", ".join(shap.get("ranked_drivers", [])[:3]) or shap.get("top_driver", "sensor deviation")
+    source_lines = "\n".join(f"- {h['source']}" for h in hits[:3]) or "- No hosted source matched."
+    part_lines = "\n".join(
+        f"- `{p['part_no']}`: {p['status']} (lead {p['lead_time_days']}d, unit ${p['unit_cost_usd']:,.0f})"
+        for p in parts
+    ) or "- No parts mapped."
+    constraint = risk.get("constraint_flag") or "No constraint flag in snapshot."
+    emv = float(risk.get("emv", 0) or 0)
+    value_at_risk = float(risk.get("averted_usd", 0) or 0)
+    text = f"""> (Hosted demo fallback: Gemini was unavailable, so this answer is rendered from bundled tool outputs for the signature scenario.)
+
+### 1. Operational Risk Assessment
+- **Asset:** `{aid}` | **Priority:** **{risk.get('priority_band')}** (score **{risk.get('priority_score')}/100**)
+- **Remaining Useful Life:** **{prog.get('rul_days')} days** | 30-day failure probability: **{float(prog.get('failure_probability_30d', 0)):.0%}**
+- **Independent abnormality detector:** **{abn.get('status')}** (score **{abn.get('anomaly_score')}/100**)
+- **Delay severity:** {delays.get('events', 0)} events, {delays.get('total_downtime_min', 0)} min downtime, {delays.get('tonnage_lost', 0):.0f} t lost
+- **Financial exposure:** ~${value_at_risk:,.0f} value at risk; positive expected value preserved by immediate action: ~${emv:,.0f}
+
+### 2. Diagnostic & Root-Cause Breakdown
+- **Top drivers:** {drivers}
+- **Abnormal evidence:** {abn.get('recommendation', 'Review sensor deviations.')}
+- **Top sensor:** {shap.get('top_driver', 'n/a')} from snapshot attribution method `{shap.get('method', 'snapshot')}`.
+
+### 3. Actionable Maintenance Blueprint
+- **Immediate action:** do not assume a normal replacement window; run monitored degradation controls and verify gearbox isolation steps from retrieved SOP evidence.
+- **Constraint-aware flip:** the plan changes from simple "replace now" to monitored degradation plus expedited procurement because the limiting part cannot arrive before predicted failure.
+
+### 4. Supply-Chain Logistics Strategy
+- **Constraint:** {constraint}
+- **Limiting part:** `{limiting.get('part_no', 'n/a')}` with lead time **{limiting.get('lead_time_days', 'n/a')}d** versus RUL **{prog.get('rul_days')}d**.
+{part_lines}
+
+### 5. Traceability & Audit Trail
+- **Source of truth:** hosted snapshot exported from the real tool suite; no live write was performed.
+- **Retrieved sources:**
+{source_lines}
+- **Fallback trigger:** asset resolver mapped the prompt to `{aid}`; canned fallback is allowed only on a fresh single-turn hosted demo request.
+"""
+    return {
+        "text": text,
+        "sources": [{"source": h["source"], "type": h["type"], "asset_id": h["asset_id"]} for h in hits],
+        "stop_reason": "hosted_demo_fallback",
+        "fallback": True,
+        "fallback_note": "Hosted demo fallback: Gemini failed for the signature GEARBOX-05 scenario; rendered from bundled tool outputs.",
+        "model": "deterministic-hosted-fallback",
+    }
+
+
 TOOL_FUNCS = {
     "resolve_asset": lambda a: resolve_asset(a["query"]),
     "prognostic_tool": lambda a: prognostic_tool(a["asset_id"]),
@@ -326,6 +536,8 @@ def dispatch(name: str, args: dict) -> tuple[object, list[dict] | None]:
 # --- stateless wizard loop ---------------------------------------------------
 
 def _tool_config() -> types.Tool:
+    if types is None:
+        raise RuntimeError("google-genai is required for hosted chat turns")
     return _load("tools", lambda: types.Tool(function_declarations=[
         types.FunctionDeclaration(**t) for t in json.loads(
             (DATA_DIR / "tools.json").read_text(encoding="utf-8"))]))
@@ -338,6 +550,11 @@ def _system_prompt() -> str:
 
 def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
     """One stateless turn. Returns (rendered, updated_history)."""
+    if genai is None or types is None or errors is None:
+        if should_use_gearbox_fallback(message, history):
+            return gearbox_fallback_response(message), []
+        raise RuntimeError("google-genai is required for hosted chat turns")
+
     # A dirty key ends up in an HTTP header and crashes ascii encoding.
     client = genai.Client(api_key=_env("GEMINI_API_KEY") or None)
     contents = [types.Content(**c) for c in history]
@@ -370,10 +587,17 @@ def chat_turn(message: str, history: list[dict]) -> tuple[dict, list[dict]]:
             except errors.APIError as e2:
                 if (e2.code not in (429, 500, 502, 503, 504)
                         or model == FALLBACK_MODEL):
+                    if should_use_gearbox_fallback(message, history):
+                        return gearbox_fallback_response(message), []
                     raise
                 model = FALLBACK_MODEL
-                response = client.models.generate_content(
-                    model=model, contents=contents, config=config_)
+                try:
+                    response = client.models.generate_content(
+                        model=model, contents=contents, config=config_)
+                except errors.APIError as e3:
+                    if should_use_gearbox_fallback(message, history):
+                        return gearbox_fallback_response(message), []
+                    raise e3
         candidate = response.candidates[0]
         contents.append(candidate.content)
         calls = [p.function_call for p in (candidate.content.parts or [])

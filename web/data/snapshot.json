@@ -116,7 +116,12 @@
         },
         "rul_days": 94.6,
         "criticality": 5,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 0.0,
+        "averted_usd": 543.5,
+        "expected_failure_loss_usd": 543.5,
+        "action_cost_usd": 168540.0,
+        "financial_action": "not_economic_on_30d_horizon"
       }
     },
     "LADLE-02": {
@@ -228,7 +233,12 @@
         },
         "rul_days": 98.6,
         "criticality": 5,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 421.05,
+        "averted_usd": 421.05,
+        "expected_failure_loss_usd": 421.05,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "CONV-BELT-03": {
@@ -363,7 +373,12 @@
         },
         "rul_days": 29.9,
         "criticality": 4,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 104719.99,
+        "averted_usd": 104719.99,
+        "expected_failure_loss_usd": 104719.99,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "CONV-BELT-08": {
@@ -481,7 +496,12 @@
         },
         "rul_days": 89.7,
         "criticality": 3,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 262.14,
+        "averted_usd": 262.14,
+        "expected_failure_loss_usd": 262.14,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "PUMP-12": {
@@ -624,7 +644,12 @@
         },
         "rul_days": 34.9,
         "criticality": 4,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 103950.55,
+        "averted_usd": 131820.55,
+        "expected_failure_loss_usd": 131820.55,
+        "action_cost_usd": 27870.0,
+        "financial_action": "positive_expected_value"
       }
     },
     "PUMP-19": {
@@ -736,7 +761,12 @@
         },
         "rul_days": 93.6,
         "criticality": 3,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 168.55,
+        "averted_usd": 168.55,
+        "expected_failure_loss_usd": 168.55,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "HYD-VALVE-07": {
@@ -865,7 +895,12 @@
         },
         "rul_days": 29.8,
         "criticality": 4,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 130772.99,
+        "averted_usd": 130772.99,
+        "expected_failure_loss_usd": 130772.99,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "ROLL-MILL-04": {
@@ -1000,7 +1035,12 @@
         },
         "rul_days": 33.1,
         "criticality": 5,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 0.0,
+        "averted_usd": 94643.47,
+        "expected_failure_loss_usd": 94643.47,
+        "action_cost_usd": 179500.0,
+        "financial_action": "not_economic_on_30d_horizon"
       }
     },
     "ROLL-MILL-11": {
@@ -1118,7 +1158,12 @@
         },
         "rul_days": 97.5,
         "criticality": 4,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 161.55,
+        "averted_usd": 161.55,
+        "expected_failure_loss_usd": 161.55,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "GEARBOX-05": {
@@ -1247,7 +1292,12 @@
         },
         "rul_days": 36.1,
         "criticality": 4,
-        "constraint_flag": "LEAD TIME EXCEEDS RUL - part arrives after predicted failure (45d lead vs 36d RUL); shift to monitored degradation strategy."
+        "constraint_flag": "LEAD TIME EXCEEDS RUL - part arrives after predicted failure (45d lead vs 36d RUL); shift to monitored degradation strategy.",
+        "emv": 122756.05,
+        "averted_usd": 122756.05,
+        "expected_failure_loss_usd": 122756.05,
+        "action_cost_usd": 0.0,
+        "financial_action": "monitor"
       }
     },
     "COMPRESSOR-09": {
@@ -1368,7 +1418,12 @@
         },
         "rul_days": 88.8,
         "criticality": 3,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 0.0,
+        "averted_usd": 282.04,
+        "expected_failure_loss_usd": 282.04,
+        "action_cost_usd": 32650.0,
+        "financial_action": "not_economic_on_30d_horizon"
       }
     },
     "CRANE-06": {
@@ -1480,7 +1535,12 @@
         },
         "rul_days": 99.4,
         "criticality": 3,
-        "constraint_flag": null
+        "constraint_flag": null,
+        "emv": 0.0,
+        "averted_usd": 239.58,
+        "expected_failure_loss_usd": 239.58,
+        "action_cost_usd": 18280.0,
+        "financial_action": "not_economic_on_30d_horizon"
       }
     }
   }

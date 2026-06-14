@@ -1,9 +1,8 @@
 """Vercel Python function for the hosted demo.
 
-The pyproject [tool.vercel] entrypoint routes ALL requests here (the current
-Python runtime does not serve static files alongside an entrypoint), so this
-handler serves the chat UI on GET / and the wizard API on POST /api/chat:
-{message, history} -> {text, sources, stop_reason, history}.
+Vercel discovers this `/api/chat.py` handler as the `/api/chat` function. The
+static chat UI is served from `index.html`; the GET fallback here is kept for
+local/manual function checks.
 """
 import json
 import sys
