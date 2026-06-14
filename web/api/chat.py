@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from api._core import chat_turn, rate_limited  # noqa: E402
+from api._core import chat_turn, dashboard_payload, rate_limited  # noqa: E402
 
 INDEX_HTML = Path(__file__).resolve().parent.parent / "index.html"
 MAX_HISTORY_MESSAGES = 60  # ~10 multi-tool turns; caps token spend
@@ -18,13 +18,16 @@ MAX_HISTORY_MESSAGES = 60  # ~10 multi-tool turns; caps token spend
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path.split("?")[0] in ("/", "/index.html"):
+        path = self.path.split("?")[0]
+        if path in ("/", "/index.html"):
             body = INDEX_HTML.read_bytes()
             self.send_response(200)
             self.send_header("content-type", "text/html; charset=utf-8")
             self.send_header("content-length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif path == "/api/dashboard":
+            self._send(200, dashboard_payload())
         else:
             self._send(404, {"error": "not found"})
 
